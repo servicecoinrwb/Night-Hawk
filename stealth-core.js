@@ -148,6 +148,53 @@ button.ghost:hover{border-color:rgba(255,255,255,.5);color:#fff}
 .docBox h4{font-size:11px;letter-spacing:2px;color:#7a7566;font-weight:700}
 .docBox p{font-size:15px;font-weight:600;margin-top:10px;line-height:1.55}
 .docBox small{display:block;margin-top:16px;font-size:11.5px;color:#7a7566;font-weight:600}
+
+/* ── intrusion terminal ── */
+#term{position:fixed;inset:0;z-index:23;display:none;align-items:center;justify-content:center;
+  background:rgba(1,4,7,.82)}
+#term.on{display:flex}
+.termBox{width:min(560px,94vw);border:1px solid rgba(95,230,255,.35);background:#050d14;
+  box-shadow:0 0 60px rgba(0,0,0,.8), inset 0 0 60px rgba(95,230,255,.04);padding:0 0 16px}
+.termTop{display:flex;justify-content:space-between;align-items:baseline;padding:14px 18px 10px;
+  border-bottom:1px solid rgba(95,230,255,.2)}
+.termTop b{font-size:12px;font-weight:700;letter-spacing:2.4px;color:var(--cyan)}
+.termTop span{font-size:11px;font-weight:600;color:var(--steel);letter-spacing:1px}
+#termBody{padding:18px;min-height:210px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px}
+.termHint{font-size:12.5px;font-weight:600;color:var(--steel);text-align:center;line-height:1.5;max-width:44ch}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+.cell{width:52px;height:52px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.03);
+  cursor:pointer;transition:background .1s,border-color .1s}
+.cell:hover{border-color:rgba(95,230,255,.5)}
+.cell.lit{background:rgba(95,230,255,.75);border-color:var(--cyan);box-shadow:0 0 18px rgba(95,230,255,.6)}
+.cell.ok{background:rgba(77,255,158,.5);border-color:var(--green)}
+.cell.no{background:rgba(255,36,24,.5);border-color:var(--red)}
+.dials{display:flex;gap:10px}
+.dial{width:64px;height:74px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.03);
+  font-family:inherit;font-size:30px;font-weight:700;color:#e8ecf7;cursor:pointer}
+.dial:hover{border-color:rgba(95,230,255,.5)}
+.dial.set{color:var(--green);border-color:rgba(77,255,158,.5)}
+.target{display:flex;gap:10px}
+.tgl{width:64px;text-align:center;font-size:24px;font-weight:700;color:var(--amber)}
+.lockTrack{position:relative;width:min(420px,80%);height:34px;border:1px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.03);overflow:hidden}
+#lockWin{position:absolute;top:0;bottom:0;background:rgba(77,255,158,.28);border-left:1px solid var(--green);
+  border-right:1px solid var(--green)}
+#lockMark{position:absolute;top:0;bottom:0;width:4px;background:#fff;box-shadow:0 0 12px #fff}
+.termBtn{font-family:inherit;font-size:15px;font-weight:700;letter-spacing:1px;color:#02141a;
+  background:var(--cyan);border:0;padding:11px 30px;cursor:pointer}
+.pips{display:flex;gap:6px}
+.pip{width:22px;height:6px;background:rgba(255,255,255,.14)}
+.pip.on{background:var(--green);box-shadow:0 0 10px rgba(77,255,158,.6)}
+.termBar{height:5px;background:rgba(255,255,255,.07);margin:0 18px;position:relative;overflow:hidden}
+#termTime{position:absolute;inset:0;background:var(--cyan);transform-origin:left center;transform:scaleX(1)}
+#termTime.low{background:var(--red)}
+.termFoot{display:flex;justify-content:space-between;align-items:center;padding:12px 18px 0}
+#termMsg{font-size:12px;font-weight:600;color:var(--steel)}
+#termMsg.bad{color:var(--red)} #termMsg.good{color:var(--green)}
+#termAbort{font-family:inherit;font-size:11.5px;font-weight:700;letter-spacing:1.4px;color:#cfd6e8;
+  background:transparent;border:1px solid rgba(255,255,255,.22);padding:8px 16px;cursor:pointer}
+#termAbort:hover{border-color:rgba(255,36,24,.6);color:var(--red)}
 `;
 
 const HTML = `
@@ -176,6 +223,12 @@ const HTML = `
     <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
     <button data-k="c">C</button><button data-k="0">0</button><button data-k="x">✕</button>
   </div></div></div>
+<div id="term"><div class="termBox">
+  <div class="termTop"><b id="termTitle">TERMINAL</b><span id="termStage"></span></div>
+  <div id="termBody"></div>
+  <div class="termBar"><div id="termTime"></div></div>
+  <div class="termFoot"><span id="termMsg"></span><button id="termAbort">ABORT</button></div>
+</div></div>
 <div id="doc"><div class="docBox"><h4 id="docHead">NOTE</h4><p id="docBody"></p>
   <small>Click anywhere to put it back.</small></div></div>
 <div class="screen" id="menu">
@@ -224,8 +277,10 @@ const CDOWN=+(CQ.get('down')||0);
 const CHAIN=[
   'night-hawk.html?campaign=1&leg=1&dist=2600',
   'dark-fiber.html?campaign=1&leg=2',
-  'night-hawk.html?campaign=1&leg=3&dist=3600',
-  'night-deposit.html?campaign=1&leg=4'
+  'night-hawk.html?campaign=1&leg=3&dist=3200&hostile=1',
+  'clearance.html?campaign=1&leg=4',
+  'night-hawk.html?campaign=1&leg=5&dist=3800&hostile=1',
+  'night-deposit.html?campaign=1&leg=6'
 ];
 Stealth.CHAIN=CHAIN; Stealth.CAMPAIGN=CAMPAIGN; Stealth.LEG=LEG;
 
@@ -420,7 +475,7 @@ function addCamera(o){
 
 // ── state ──
 const S={playing:false,paused:false,time:0,sus:0,peakSus:0,downed:0,crouch:false,
-  camSees:false,camsDown:0,tripped:false,clock:0,hold:0,holdTarget:null,mapDead:false};
+  camSees:false,camsDown:0,tripped:false,clock:0,hold:0,holdTarget:null,mapDead:false,termOpen:false};
 Stealth.S=S;
 const P={x:0,z:0,y:0,vx:0,vz:0};
 Stealth.P=P;
@@ -521,6 +576,172 @@ padEl.querySelectorAll('button').forEach(b=>{
   };
 });
 
+// ═══════════ intrusion terminal ═══════════
+// A tap-driven mini-game. The world KEEPS RUNNING while it is open — you are
+// stationary and blind to the room, which is the whole risk. Fumbling costs
+// detection; the clock running out ends the session.
+const termEl=document.getElementById('term');
+const termBody=document.getElementById('termBody');
+const termTime=document.getElementById('termTime');
+const termMsg=document.getElementById('termMsg');
+const termStageEl=document.getElementById('termStage');
+const GLYPHS=['\u25B2','\u25A0','\u25CF','\u2726','\u25C6','\u2B22'];
+let TERM=null;
+
+function termSay(t,cls){ termMsg.textContent=t; termMsg.className=cls||''; }
+function termFumble(cost,text){
+  S.sus=Math.min(97,S.sus+(cost||8));
+  termSay(text||'Rejected. That went somewhere.','bad');
+  blip(150,0.14,'square',0.12);
+}
+function closeTerm(){
+  termEl.classList.remove('on'); S.termOpen=false; TERM=null;
+  if(S.playing) document.body.requestPointerLock();
+}
+function openTerminal(o){
+  // o: {title, stages:['trace','cycle','lock'], time, onWin}
+  TERM={o, i:0, t:o.time||26, total:o.time||26};
+  S.termOpen=true;
+  termEl.classList.add('on');
+  document.getElementById('termTitle').textContent=o.title||'TERMINAL';
+  document.exitPointerLock();
+  runStage();
+}
+function runStage(){
+  if(!TERM) return;
+  const st=TERM.o.stages[TERM.i];
+  termStageEl.textContent='STAGE '+(TERM.i+1)+' / '+TERM.o.stages.length+'  ·  '+st.toUpperCase();
+  termBody.innerHTML='';
+  if(st==='trace') stageTrace();
+  else if(st==='cycle') stageCycle();
+  else stageLock();
+}
+function stageDone(){
+  if(!TERM) return;
+  TERM.i++;
+  if(TERM.i>=TERM.o.stages.length){
+    termSay('Session open.','good');
+    blip(660,0.12,'triangle',0.16); setTimeout(()=>blip(990,0.18,'triangle',0.14),110);
+    const cb=TERM.o.onWin;
+    setTimeout(()=>{ closeTerm(); if(cb) cb(); setObjective(); },600);
+  } else {
+    termSay('Layer down. Next.','good');
+    TERM.t=Math.min(TERM.total,TERM.t+6);
+    setTimeout(runStage,450);
+  }
+}
+
+// stage 1 — retrace the route the packets took
+function stageTrace(){
+  const hint=document.createElement('div'); hint.className='termHint';
+  hint.textContent='A route flashes across the switch. Tap the same nodes back, in order.';
+  const grid=document.createElement('div'); grid.className='grid';
+  const cells=[];
+  for(let i=0;i<25;i++){
+    const c=document.createElement('div'); c.className='cell'; grid.appendChild(c); cells.push(c);
+  }
+  termBody.appendChild(hint); termBody.appendChild(grid);
+  const path=[]; while(path.length<5){ const n=(Math.random()*25)|0; if(!path.includes(n)) path.push(n); }
+  let step=0, armed=false;
+  path.forEach((n,k)=>{
+    setTimeout(()=>{ cells[n].classList.add('lit'); blip(520+k*80,0.09,'square',0.08); },420+k*430);
+    setTimeout(()=>{ cells[n].classList.remove('lit'); },420+k*430+330);
+  });
+  setTimeout(()=>{ armed=true; termSay('Your turn.'); },420+path.length*430+150);
+  cells.forEach((c,idx)=>{
+    c.onclick=()=>{
+      if(!armed||!TERM) return;
+      if(idx===path[step]){
+        c.classList.add('ok'); blip(760+step*60,0.07,'square',0.09); step++;
+        if(step>=path.length) stageDone();
+      } else {
+        c.classList.add('no'); setTimeout(()=>c.classList.remove('no'),260);
+        step=0; cells.forEach(x=>x.classList.remove('ok'));
+        termFumble(9,'Wrong node. The switch logged that.');
+      }
+    };
+  });
+}
+// stage 2 — line the glyphs up with the header
+function stageCycle(){
+  const hint=document.createElement('div'); hint.className='termHint';
+  hint.textContent='Four fields, one header. Tap each field until it matches above it.';
+  const tgtRow=document.createElement('div'); tgtRow.className='target';
+  const row=document.createElement('div'); row.className='dials';
+  const want=[], cur=[];
+  for(let i=0;i<4;i++){
+    want.push((Math.random()*GLYPHS.length)|0);
+    cur.push((want[i]+1+((Math.random()*(GLYPHS.length-1))|0))%GLYPHS.length);
+    const t=document.createElement('div'); t.className='tgl'; t.textContent=GLYPHS[want[i]]; tgtRow.appendChild(t);
+  }
+  const btns=[];
+  for(let i=0;i<4;i++){
+    const b=document.createElement('button'); b.className='dial'; b.textContent=GLYPHS[cur[i]];
+    b.onclick=()=>{
+      if(!TERM) return;
+      cur[i]=(cur[i]+1)%GLYPHS.length; b.textContent=GLYPHS[cur[i]];
+      b.classList.toggle('set',cur[i]===want[i]);
+      blip(420+i*70,0.05,'square',0.06);
+      if(cur.every((v,k)=>v===want[k])) stageDone();
+    };
+    row.appendChild(b); btns.push(b);
+    if(cur[i]===want[i]) b.classList.add('set');
+  }
+  termBody.appendChild(hint); termBody.appendChild(tgtRow); termBody.appendChild(row);
+  termSay('No penalty for over-shooting. Only the clock.');
+}
+// stage 3 — catch the carrier three times, window shrinks
+function stageLock(){
+  const hint=document.createElement('div'); hint.className='termHint';
+  hint.textContent='Catch the carrier inside the window. Three times, and it gets narrower.';
+  const track=document.createElement('div'); track.className='lockTrack';
+  const win=document.createElement('div'); win.id='lockWin';
+  const mark=document.createElement('div'); mark.id='lockMark';
+  track.appendChild(win); track.appendChild(mark);
+  const pips=document.createElement('div'); pips.className='pips';
+  const pipEls=[]; for(let i=0;i<3;i++){ const p=document.createElement('div'); p.className='pip'; pips.appendChild(p); pipEls.push(p); }
+  const btn=document.createElement('button'); btn.className='termBtn'; btn.textContent='LOCK';
+  termBody.appendChild(hint); termBody.appendChild(track); termBody.appendChild(pips); termBody.appendChild(btn);
+  let hits=0, wWidth=26, wPos=Math.random()*60+8, pos=0, dir=1, speed=58;
+  const place=()=>{ win.style.left=wPos+'%'; win.style.width=wWidth+'%'; };
+  place();
+  TERM.lock=setInterval(()=>{
+    if(!TERM) return;
+    pos+=dir*speed*0.03;
+    if(pos>100){pos=100;dir=-1;} if(pos<0){pos=0;dir=1;}
+    mark.style.left=pos+'%';
+  },30);
+  btn.onclick=()=>{
+    if(!TERM) return;
+    if(pos>=wPos && pos<=wPos+wWidth){
+      hits++; pipEls[hits-1].classList.add('on');
+      blip(700+hits*140,0.1,'triangle',0.13);
+      if(hits>=3){ clearInterval(TERM.lock); TERM.lock=null; stageDone(); return; }
+      wWidth=Math.max(11,wWidth-6); wPos=Math.random()*(96-wWidth); speed+=16; place();
+      termSay('Locked. Tighter now.','good');
+    } else termFumble(7,'Missed the window. Carrier spiked.');
+  };
+}
+document.getElementById('termAbort').onclick=()=>{
+  if(TERM&&TERM.lock) clearInterval(TERM.lock);
+  termSay('Session dropped.');
+  closeTerm();
+};
+function tickTerm(dt){
+  if(!TERM) return;
+  TERM.t-=dt;
+  termTime.style.transform='scaleX('+Math.max(0,TERM.t/TERM.total)+')';
+  termTime.classList.toggle('low',TERM.t<6);
+  if(TERM.t<=0){
+    if(TERM.lock) clearInterval(TERM.lock);
+    S.sus=Math.min(99,S.sus+22);
+    termSay('Session timed out.','bad');
+    blip(120,0.5,'sawtooth',0.18);
+    setTimeout(closeTerm,400);
+    TERM=null;
+  }
+}
+
 // ── input ──
 const keys={}; let eTap=false, yaw=Math.PI, pitch=0, locked=false, SENS=14;
 const sensEl=document.getElementById('sens'), sensVal=document.getElementById('sensVal');
@@ -545,7 +766,7 @@ addEventListener('mousemove',e=>{
 });
 document.addEventListener('pointerlockchange',()=>{ locked=document.pointerLockElement===document.body; });
 renderer.domElement.addEventListener('click',()=>{
-  if(S.playing && !padEl.classList.contains('on') && !docEl.classList.contains('on')
+  if(S.playing && !S.termOpen && !padEl.classList.contains('on') && !docEl.classList.contains('on')
      && !jEl.classList.contains('on') && helpEl.classList.contains('hidden'))
     document.body.requestPointerLock();
 });
@@ -848,7 +1069,8 @@ const menu=document.getElementById('menu'), endS=document.getElementById('end');
 function start(){
   initAudio(); if(AC.state==='suspended') AC.resume();
   Object.assign(S,{playing:true,paused:false,time:0,sus:0,peakSus:0,downed:0,crouch:false,
-    camSees:false,camsDown:0,tripped:false,clock:0,hold:0,holdTarget:null,mapDead:false});
+    camSees:false,camsDown:0,tripped:false,clock:0,hold:0,holdTarget:null,mapDead:false,termOpen:false});
+  termEl.classList.remove('on'); TERM=null;
   if(CFG.reset) CFG.reset(S);
   guards.forEach(g=>{
     g.down=false; g.searched=false; g.sus=0; g.wp=1; g.pause=0; g.mode='patrol';
@@ -897,9 +1119,9 @@ function frame(now){
   const dt=Math.min((now-last)/1000,0.05); last=now;
   if(S.playing && !S.paused){
     S.time+=dt;
-    const running=move(dt);
-    scan();
-    if(keys['e']) tryUse(dt,eTap);
+    const running = S.termOpen ? false : move(dt);
+    if(S.termOpen) tickTerm(dt); else scan();
+    if(!S.termOpen && keys['e']) tryUse(dt,eTap);
     else if(S.holdTarget){ S.holdTarget=null; S.hold=0; H.progWrap.classList.remove('on'); }
     eTap=false;
     if(S.tripped){ S.clock-=dt; if(S.clock<=0) finish(false,'alarm'); }
@@ -928,7 +1150,7 @@ addEventListener('resize',()=>{
 
 // ── builder api handed to the mission ──
 const api={THREE,scene,MAT,box,slab,colliders,addInteract,addGuard,addCamera,
-  log,showDoc,openPad,safeSpot,blocked,groundAt,losClear,setObjective,finish,blip,
+  log,showDoc,openPad,openTerminal,safeSpot,blocked,groundAt,losClear,setObjective,finish,blip,
   P,S,guards,seccams,LV,PLATE,TOWER,
   trip(seconds){ S.tripped=true; S.clock=seconds;
     guards.forEach(g=>{ if(!g.down){ g.alerted=true; g.sus=Math.max(g.sus,50); } }); },
