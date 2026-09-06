@@ -193,7 +193,7 @@
     <div class="meter">
       <div class="meterTop"><b>Turbo</b><span id="turboPct">100%</span></div>
       <div class="bar"><div class="fill" id="turboFill"></div></div>
-      <div class="why" id="turboWhy">Full. Hold Shift for the overtake.</div>
+      <div class="why" id="turboWhy">Full. Hold Up for the overtake.</div>
     </div>
 
     <div class="meter" id="oilMeter">
@@ -227,7 +227,7 @@
     <div class="key"><b>Space</b><span>Machine gun. Hold it and the barrels cook.</span></div>
     <div class="key"><b>↓</b><span>Brake. Slows hard and tightens your steering.</span></div>
     <div class="key"><b>E</b><span>Drop an oil slick. Catches whatever is on your bumper.</span></div>
-    <div class="key"><b>Shift</b><span>Turbo. Burns the bar, refills when you ease off.</span></div>
+    <div class="key"><b>↑ / W</b><span>Turbo. Burns the bar, refills when you ease off.</span></div>
     <div class="key"><b>J</b><span>Hop. Clears a car, never a trailer.</span></div>
     <div class="key"><b>P / M / N</b><span>Pause, mute everything, or kill just the music.</span></div>
     <div class="key"><b>Esc</b><span>Back to this screen at any time.</span></div>
@@ -242,7 +242,7 @@
   </div>
   <p class="modeNote"><b>Action</b> is the full thing: three hunter crews, your guns and oil, three panels of hull.
   <b>Cruise</b> empties the road of hostiles and stows the weapons — five panels, just you, the traffic, the road work and the spills.
-  <b>Time attack</b> is a five-stage course against a countdown: every checkpoint buys you 26 more seconds, every crash costs 3.</p>
+  <b>Time attack</b> is a five-stage course against a countdown: every gate buys you 26 seconds and repairs a panel, every crash costs 3 seconds. No hostiles, no supply semi — the gates are your lifeline.</p>
   <p class="modeNote" style="margin-top:20px">Side job: <a href="dark-fiber.html" style="color:var(--vector);font-weight:700">DARK FIBER</a> — first-person, inside a data center, no car at all. &nbsp;·&nbsp; <a href="index.html" style="color:var(--steel);font-weight:700">Back to menu</a></p>
   <p class="foot">Original build. Not affiliated with any television or arcade property.</p>
 </div>
@@ -271,7 +271,7 @@
     <div class="key"><b>Space</b><span>Machine gun — barrels jam if you hold it</span></div>
     <div class="key"><b>↓</b><span>Brake — also tightens your steering</span></div>
     <div class="key"><b>E</b><span>Drop oil behind you</span></div>
-    <div class="key"><b>Shift</b><span>Turbo</span></div>
+    <div class="key"><b>↑ / W</b><span>Turbo</span></div>
     <div class="key"><b>J</b><span>Hop — clears a car, never a trailer</span></div>
     <div class="key"><b>P / M / N</b><span>Pause · mute · music off</span></div>
     <div class="key"><b>H</b><span>This card</span></div>
@@ -283,7 +283,7 @@
     <b>Barrels</b> cost the combo, the <b>arrow board</b> costs a panel.
     <b>Spills</b> cut steering to a third — ease off, don't fight it.
     <b>The supply semi</b> repairs, restocks and cools you — drive in straight or it wrecks you.
-    <b>Time attack:</b> five gates, 1,500m apart. Each one adds 26 seconds, each crash costs 3, and there are no hostiles — just you and the clock.
+    <b>Time attack:</b> five gates, 1,500m apart. Each one adds 26 seconds and patches one panel. Each crash costs 3 seconds. No hostiles and no supply semi — the gates are the only repair.
     Every whole minute alive banks 1,000 × your multiplier.
   </p>
   <div class="btnRow">
@@ -987,8 +987,11 @@ function paintHUD(){
 
   el.chevs.forEach((c,i)=>c.classList.toggle('dead', i>=S.hull));
   el.hullNote.textContent = S.hull===S.hullMax ? 'Hull holding'
-    : S.hull===1 ? 'Last panel. Find the semi.'
-    : (S.hullMax-S.hull)+' gone — the semi repairs them';
+    : S.gameMode==='trial'
+      ? (S.hull===1 ? 'Last panel. The next gate gives one back.'
+                    : (S.hullMax-S.hull)+' gone — each gate repairs one')
+      : (S.hull===1 ? 'Last panel. Find the semi.'
+                    : (S.hullMax-S.hull)+' gone — the semi repairs them');
 
   const h=Math.max(0,Math.min(100,S.heat));
   el.heatFill.style.transform='scaleX('+(h/100)+')';
@@ -1001,9 +1004,9 @@ function paintHUD(){
   el.turboFill.style.transform='scaleX('+(t/100)+')';
   el.turboPct.textContent=Math.round(t)+'%';
   if(S.boosting){ el.turboWhy.textContent='Burning. Let go before it empties.'; el.turboWhy.className='why hot'; }
-  else if(t<=1){ el.turboWhy.textContent='Dry. It refills on its own — stay off Shift.'; el.turboWhy.className='why warn'; }
+  else if(t<=1){ el.turboWhy.textContent='Dry. It refills on its own — ease off.'; el.turboWhy.className='why warn'; }
   else if(t<100){ el.turboWhy.textContent='Refilling. '+Math.round(t)+'% banked.'; el.turboWhy.className='why'; }
-  else { el.turboWhy.textContent='Full. Hold Shift for the overtake.'; el.turboWhy.className='why'; }
+  else { el.turboWhy.textContent='Full. Hold Up for the overtake.'; el.turboWhy.className='why'; }
 
   el.pips.forEach((p,i)=>p.classList.toggle('dead', i>=S.oil));
   el.oilWhy.textContent = S.oil===0
@@ -1309,7 +1312,7 @@ function frame(now){
   if(!idle && S.docking<=0){
     const left=keys['arrowleft']||keys['a']||touch.left;
     const right=keys['arrowright']||keys['d']||touch.right;
-    const wantBoost=keys['shift']||touch.boost;
+    const wantBoost=keys['arrowup']||keys['w']||touch.boost;
     const wantFire=keys[' ']||touch.fire;
     const braking=keys['arrowdown']||keys['s']||touch.brake;
     S.braking=braking;
@@ -1351,11 +1354,14 @@ function frame(now){
         S.clock+=CFG.cpBonus;
         S.cpDist+=CFG.cpSpacing;
         S.score+=1500*S.mult;
+        const patched = S.hull<S.hullMax;
+        if(patched){ S.hull++; S.invuln=Math.max(S.invuln,0.8); }
         el.timePane.classList.add('tick');
         setTimeout(()=>el.timePane.classList.remove('tick'),900);
         blip(720,0.1,'triangle',0.17);
         setTimeout(()=>blip(1080,0.16,'triangle',0.14),100);
-        say('Checkpoint '+S.stage+' of '+CFG.stages+'. Plus '+CFG.cpBonus+' seconds.');
+        say('Checkpoint '+S.stage+' of '+CFG.stages+'. Plus '+CFG.cpBonus+' seconds'
+            +(patched?' and a panel back.':'.'));
       }
       if(S.clock<=0){ S.clock=0; endRun('clock'); return; }
     }
