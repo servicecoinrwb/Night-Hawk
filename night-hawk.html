@@ -260,6 +260,7 @@
   <p id="bestNote"></p>
   <div class="btnRow">
     <button class="go" id="againBtn">Run it again</button>
+    <button class="go" id="continueBtn" style="display:none">Go in on foot</button>
     <button class="ghost" id="overBackBtn">Back to main screen</button>
   </div>
 </div>
@@ -305,6 +306,26 @@
 <script>
 (function(){
 'use strict';
+
+// ───────── campaign chaining (shared shape across all three files) ─────────
+const CQ=new URLSearchParams(location.search);
+const CAMPAIGN=CQ.get('campaign')==='1';
+const LEG=+(CQ.get('leg')||0);
+const CTIME=+(CQ.get('t')||0);
+const CDOWN=+(CQ.get('down')||0);
+const CHAIN=[
+  'night-hawk.html?campaign=1&leg=1&dist=2600',
+  'dark-fiber.html?campaign=1&leg=2',
+  'night-hawk.html?campaign=1&leg=3&dist=3600',
+  'night-deposit.html?campaign=1&leg=4'
+];
+const LEGNAME=['','RUN OUT TO THE COLO','THE COLO','RUN ACROSS TOWN','THE BANK'];
+function nextLegURL(addTime,addDown){
+  const n=CHAIN[LEG];
+  if(!CAMPAIGN||!n) return null;
+  return n+'&t='+Math.round(CTIME+(addTime||0))+'&down='+(CDOWN+(addDown||0));
+}
+function legTotal(addTime){ return Math.round(CTIME+(addTime||0)); }
 
 const CFG = {
   laneX:[-6.2,-2.1,2.1,6.2],
@@ -916,7 +937,7 @@ const S = {
   spawnT:0, chaseT:0, supplyT:0, wetT:0, workT:0, tilt:0, scanPhase:0, docking:0,
   time:0, lastMin:0, bestTime:0,
   clock:0, stage:0, cpDist:0, cleared:false, bestCourse:0, finishing:false,
-  zone:0,
+  zone:0, transit:false, transitDist:0,
   bestScore:0
 };
 const keys={}, touch={left:false,right:false,boost:false,fire:false,brake:false};
@@ -985,6 +1006,10 @@ function paintHUD(){
       : 'TIME ATTACK · STAGE '+Math.min(CFG.stages,S.stage+1)+'/'+CFG.stages;
   } else {
     el.timeVal.innerHTML=clockText(S.time,true);
+  }
+  if(S.transit){
+    el.dist.textContent='TO SITE '+Math.max(0,Math.ceil(S.transitDist-S.dist)).toLocaleString()+' m';
+    document.getElementById('modeBadge').textContent='LEG '+LEG+' · '+(LEGNAME[LEG]||'TRANSIT');
   }
   el.dist.textContent=Math.floor(S.dist).toLocaleString()+' m';
   
@@ -1147,7 +1172,7 @@ function reset(){
   el.timePane.classList.remove('tick');
   paintHUD();
 }
-function startRun(mode){
+function startRun(mode,transitDist){
   initAudio(); if(AC.state==='suspended') AC.resume();
   S.gameMode = mode || S.gameMode || 'action';
   const cruise = S.gameMode==='cruise', trial = S.gameMode==='trial';
@@ -1156,9 +1181,13 @@ function startRun(mode){
   document.getElementById('modeBadge').textContent = cruise ? 'CRUISE RUN' : trial ? 'TIME ATTACK' : '';
   document.getElementById('timeLabel').textContent = trial ? 'TIME LEFT' : 'TIME';
   reset();
+  S.transit=!!transitDist; S.transitDist=transitDist||0;
   el.menu.classList.add('hidden'); el.over.classList.add('hidden'); el.paused.classList.add('hidden');
   S.mode='run';
-  if(trial){
+  if(S.transit){
+    say(LEGNAME[LEG]||'Transit.');
+    say('Nothing hunting you on this leg. Just get there.');
+  } else if(trial){
     say('Time attack. Five checkpoints, and the clock is already running.');
     say('Each gate buys you 26 seconds. Every crash costs three.');
   } else if(cruise){
@@ -1171,7 +1200,7 @@ function startRun(mode){
 }
 function endRun(cause){
   S.mode='over';
-  if(cause==='finish'){
+  if(cause==='finish'||cause==='arrive'){
     [0,140,280,460].forEach((d,i)=> setTimeout(()=>blip([784,988,1175,1568][i],0.22,'triangle',0.17),d));
   } else {
     noiseHit(0.6,0.7); sweepDown(340,50,0.9);
@@ -1182,11 +1211,13 @@ function endRun(cause){
   el.fDist.textContent=Math.floor(S.dist).toLocaleString();
   el.fKills.textContent=S.kills;
   el.fBest.textContent=S.bestCombo;
-  el.overTitle.textContent = cause==='finish'?'COURSE CLEAR'
+  el.overTitle.textContent = cause==='arrive'?'ARRIVED'
+    : cause==='finish'?'COURSE CLEAR'
     : cause==='clock'?'TIME OUT'
     : cause==='rail'?'INTO THE RAIL':cause==='blade'?'CUT DOWN':'WRECKED';
   el.verdict.textContent =
-    cause==='finish' ? 'Four gates and into the back of the trailer at '+clockText(S.time,false)+'. Crashes cost '+CFG.crashPenalty+' seconds each — a clean run beats a fast one.'
+    cause==='arrive' ? 'Lights off, engine off, half a block back from the building. From here you walk.'
+    : cause==='finish' ? 'Four gates and into the back of the trailer at '+clockText(S.time,false)+'. Crashes cost '+CFG.crashPenalty+' seconds each — a clean run beats a fast one.'
     : cause==='clock' ? (S.finishing
         ? 'Clock died with the trailer in sight. The last leg has no gate to buy you time — you have to be in the back of that truck before it runs out.'
         : 'Clock ran out '+Math.max(0,Math.ceil(S.cpDist-S.dist)).toLocaleString()+'m short of gate '+(S.stage+1)+'. Turbo between traffic, and stop braking for gaps you could thread.')
@@ -1215,6 +1246,10 @@ function endRun(cause){
       + (longest?'Longest run too.':'Longest run: '+clockText(S.bestTime,false)+'.')
       + ' Both reset when you reload.';
   }
+  const cont=document.getElementById('continueBtn');
+  const nxt=(cause==='arrive') ? nextLegURL(S.time,0) : null;
+  if(nxt){ cont.style.display=''; cont.onclick=()=>location.href=nxt; el.bestNote.textContent=''; }
+  else cont.style.display='none';
   el.over.classList.remove('hidden');
   setCue(null);
 }
@@ -1281,6 +1316,17 @@ if('ontouchstart' in window){
 document.getElementById('startAction').onclick=()=>startRun('action');
 document.getElementById('startCruise').onclick=()=>startRun('cruise');
 document.getElementById('startTrial').onclick=()=>startRun('trial');
+if(CAMPAIGN && CQ.get('dist')){
+  const d=+CQ.get('dist');
+  document.getElementById('startCruise').style.display='none';
+  document.getElementById('startTrial').style.display='none';
+  const b=document.getElementById('startAction');
+  b.textContent='Drive to the site';
+  b.onclick=()=>startRun('cruise',d);
+  document.querySelector('#menu .modeNote').innerHTML =
+    '<b>Leg '+LEG+' — '+(LEGNAME[LEG]||'transit')+'.</b> '+d.toLocaleString()+
+    ' metres of open road with nothing hunting you. Get there in one piece.';
+}
 document.getElementById('againBtn').onclick=()=>startRun(S.gameMode);
 document.getElementById('resumeBtn').onclick=togglePause;
 document.getElementById('overBackBtn').onclick=toMenu;
@@ -1390,6 +1436,8 @@ function frame(now){
       }
       if(S.clock<=0){ S.clock=0; endRun('clock'); return; }
     }
+    if(S.transit && S.dist>=S.transitDist){ endRun('arrive'); return; }
+
     const zoneLen = S.gameMode==='trial' ? CFG.cpSpacing : 1800;
     const wantZone = Math.min(ZONES.length-1, Math.floor(S.dist/zoneLen));
     if(wantZone>S.zone){
