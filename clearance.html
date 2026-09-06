@@ -85,7 +85,7 @@ Stealth.init({
   mapMarks:(S,li)=>{
     const m=[];
     m.push({x:-17,z:-6,c:M.data?'rgba(77,255,158,.35)':'#4dff9e'});        // server terminal
-    m.push({x:6,z:13,c:M.manifest?'rgba(77,255,158,.35)':'#ffb020'});      // registry cabinet
+    m.push({x:20,z:12,c:M.manifest?'rgba(77,255,158,.35)':'#ffb020'});     // registry cabinet
     m.push({x:0,z:-14,c:M.blueprints?'rgba(77,255,158,.35)':'#d8b25a'});   // vault
     m.push({x:17,z:-13,c:M.codeKnown?'rgba(77,255,158,.35)':'#5fe6ff'});   // duty log
     m.push({x:0,z:17,r:0.8,c:haul()>0?'#4dff9e':'rgba(143,154,184,.6)'});  // exit
@@ -124,6 +124,19 @@ Stealth.init({
   build(A){
     const {box,slab,MAT,THREE,scene}=A;
     const H=4.6;
+
+    // A wall with a doorway cut into it. Passing doorAt=null makes it solid.
+    // Every interior wall goes through one of these two — placing a door mesh
+    // inside an unbroken wall is what sealed four rooms.
+    function wallAlongZ(x,z0,z1,doorAt,doorW){
+      const segs = doorAt===null?[[z0,z1]]:[[z0,doorAt-doorW/2],[doorAt+doorW/2,z1]];
+      segs.forEach(g=>{ const d=g[1]-g[0]; if(d>0.15) box(0.4,H,d,MAT.wall,x,H/2,(g[0]+g[1])/2,true); });
+    }
+    function wallAlongX(z,x0,x1,doorAt,doorW){
+      const segs = doorAt===null?[[x0,x1]]:[[x0,doorAt-doorW/2],[doorAt+doorW/2,x1]];
+      segs.forEach(g=>{ const d=g[1]-g[0]; if(d>0.15) box(d,H,0.4,MAT.wall,(g[0]+g[1])/2,H/2,z,true); });
+    }
+    const lastCol=()=>A.colliders[A.colliders.length-1];
     slab(-24,24,-18,18,0,MAT.floor);
     slab(-24,24,-18,18,H,MAT.wall);
 
@@ -138,17 +151,16 @@ Stealth.init({
       box(1.0,H,1.0,MAT.panel,px,H/2,pz,true);
 
     // ── WEST WING: server hall ──
-    box(0.4,H,18,MAT.wall,-11,H/2,-6,true);
-    box(13,H,0.4,MAT.wall,-17.5,H/2,3,true);
-    const westDoor=box(0.24,3.0,2.2,MAT.steel,-11,1.5,2.0,true);
-    const westLamp=box(0.06,0.14,0.14,MAT.red,-10.85,2.35,2.0,false);
+    wallAlongZ(-11,-18,3,1.0,2.4);
+    wallAlongX(3,-24,-11,null);
+    const westDoor=box(0.28,3.0,2.4,MAT.steel,-11,1.5,1.0,true);
+    const westCol=lastCol();
+    const westLamp=box(0.06,0.14,0.14,MAT.red,-10.78,2.4,1.0,false);
     A.addInteract(westDoor,{
       name:'SERVER HALL', hint:'Badge reader on the frame.', verb:'BADGE THROUGH',
       locked:()=> M.badge>=1?null:'No badge. Any of them will do for this door.',
-      act(){ westDoor.position.x=-11.9; westDoor.rotation.y=1.2;
-        westLamp.material=MAT.green;
-        const c=A.colliders.find(c=>Math.abs(c.x+11)<0.3&&Math.abs(c.z-2)<0.3);
-        if(c){c.hw=0.05;c.hd=0.05;}
+      act(){ westDoor.position.set(-11.6,1.5,-0.2); westDoor.rotation.y=1.15;
+        westLamp.material=MAT.green; westCol.hw=0.05; westCol.hd=0.05;
         A.log('Server hall open.','good'); }
     });
     for(let i=0;i<5;i++){
@@ -172,21 +184,21 @@ Stealth.init({
     });
 
     // ── SOUTH WING: registry ──
-    box(0.4,H,12,MAT.wall,11,H/2,10,true);
-    const regDoor=box(0.24,3.0,2.2,MAT.steel,11,1.5,6.0,true);
-    const regLamp=box(0.06,0.14,0.14,MAT.red,11.15,2.35,6.0,false);
+    wallAlongZ(11,4,18,6.0,2.4);
+    wallAlongX(4,11,24,null);
+    const regDoor=box(0.28,3.0,2.4,MAT.steel,11,1.5,6.0,true);
+    const regCol=lastCol();
+    const regLamp=box(0.06,0.14,0.14,MAT.red,11.22,2.4,6.0,false);
     A.addInteract(regDoor,{
       name:'REGISTRY', hint:'Badge reader.', verb:'BADGE THROUGH',
       locked:()=> M.badge>=1?null:'No badge.',
-      act(){ regDoor.position.set(11.9,1.5,6.9); regDoor.rotation.y=1.2;
-        regLamp.material=MAT.green;
-        const c=A.colliders.find(c=>Math.abs(c.x-11)<0.3&&Math.abs(c.z-6)<0.3);
-        if(c){c.hw=0.05;c.hd=0.05;}
+      act(){ regDoor.position.set(11.6,1.5,4.9); regDoor.rotation.y=-1.15;
+        regLamp.material=MAT.green; regCol.hw=0.05; regCol.hd=0.05;
         A.log('Registry open.','good'); }
     });
     for(let i=0;i<4;i++) box(3.0,2.0,0.9,MAT.panel,16,1.0,9+i*2.2,true,0.1);
-    const cab=box(1.4,1.9,0.7,MAT.steel,6,0.95,13,true,0.1);
-    const cabLamp=box(0.1,0.1,0.06,MAT.amber,6,1.8,12.6,false);
+    const cab=box(1.4,1.9,0.7,MAT.steel,20,0.95,12,true,0.1);
+    const cabLamp=box(0.1,0.1,0.06,MAT.amber,20,1.8,11.6,false);
     A.addInteract(cab,{
       name:'REGISTRY CABINET', hint:'Weapons manifest — inventory sheets, serial ranges, nothing you can build from.',
       verb:'HOLD E — LIFT', hold:3.4,
@@ -196,11 +208,12 @@ Stealth.init({
     });
 
     // ── NORTH WING: the SCIF ──
-    box(0.4,H,8,MAT.wall,-7,H/2,-14,true);
-    box(0.4,H,8,MAT.wall,7,H/2,-14,true);
-    box(14,H,0.4,MAT.wall,0,H/2,-10,true);
-    const scifDoor=box(2.4,3.2,0.3,MAT.steel,0,1.6,-10,true);
-    const scifLamp=box(0.14,0.14,0.06,MAT.red,1.0,2.6,-9.8,false);
+    wallAlongZ(-7,-18,-10,null);
+    wallAlongZ(7,-18,-10,null);
+    wallAlongX(-10,-7,7,0,2.6);
+    const scifDoor=box(2.6,3.2,0.3,MAT.steel,0,1.6,-10,true);
+    const scifCol=lastCol();
+    const scifLamp=box(0.14,0.14,0.06,MAT.red,1.55,2.6,-9.78,false);
     A.addInteract(scifDoor,{
       name:'SHIELDED ROOM', hint:'Keypad and a supervisor reader. It wants both.',
       verb:'ENTER CODE',
@@ -212,9 +225,8 @@ Stealth.init({
       },
       act(){ A.openPad('SHIELDED ROOM',SCIF_CODE,()=>{
         M.scifOpen=true; scifLamp.material=MAT.green;
-        scifDoor.position.set(-2.2,1.6,-10.4); scifDoor.rotation.y=1.1;
-        const c=A.colliders.find(c=>Math.abs(c.x)<0.3&&Math.abs(c.z+10)<0.3);
-        if(c){c.hw=0.05;c.hd=0.05;}
+        scifDoor.position.set(-2.0,1.6,-10.9); scifDoor.rotation.y=1.1;
+        scifCol.hw=0.05; scifCol.hd=0.05;
         A.log('Shielded room open. No map past this line.','good');
       },'Four digits. From the duty log.'); }
     });
@@ -229,8 +241,8 @@ Stealth.init({
     });
 
     // ── watch office ──
-    box(0.4,H,7,MAT.wall,13,H/2,-14.5,true);
-    box(11,H,0.4,MAT.wall,18.5,H/2,-11,true);
+    wallAlongZ(13,-18,-11,null);
+    wallAlongX(-11,13,24,16.5,2.6);
     box(2.4,0.08,1.1,MAT.steel,17,0.78,-13,true,0.1);
     const dutyLog=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.03,0.46),MAT.paper);
     dutyLog.position.set(17,0.83,-13); dutyLog.rotation.y=0.3; scene.add(dutyLog);
