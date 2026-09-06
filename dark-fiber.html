@@ -159,6 +159,7 @@
       <div class="tag" id="tagClues">CLUES 0/3</div>
       <div class="tag" id="tagDisc">NO DISC</div>
       <div class="tag" id="tagLights">LIGHTS ON</div>
+      <div class="tag" id="tagCams">CAMS LIVE</div>
     </div>
   </div>
 
@@ -209,6 +210,7 @@
     <div class="key"><b>Tab</b> <span>Case notes. Q works too.</span></div>
     <div class="key"><b>F</b><span>Flashlight. They can see it.</span></div>
     <div class="key"><b>M / N</b><span>Mute everything, or just the music.</span></div>
+    <div class="key"><b>H</b><span>Quick check — pull this up any time.</span></div>
     <div class="key"><b>Cameras</b><span>Sweeping, ceiling-mounted. Racks block them, crouching doesn't.</span></div>
   </div>
 
@@ -221,6 +223,33 @@
   <div class="btnRow">
     <button class="go" id="startBtn">Go in</button>
     <button class="ghost" id="menuBackBtn">Back to menu</button>
+  </div>
+</div>
+
+<div class="screen hidden" id="help">
+  <h1 class="title" style="font-size:clamp(30px,6.5vw,58px)">QUICK CHECK</h1>
+  <div class="keys">
+    <div class="key"><b>W A S D</b><span>Move · mouse looks</span></div>
+    <div class="key"><b>C</b><span>Crouch — toggles, you don't hold it</span></div>
+    <div class="key"><b>Shift</b><span>Run — they hear it through the racks</span></div>
+    <div class="key"><b>E</b><span>Use, take, or choke out from behind</span></div>
+    <div class="key"><b>Tab / Q</b><span>Case notes</span></div>
+    <div class="key"><b>F</b><span>Flashlight — they can see it</span></div>
+    <div class="key"><b>M / N</b><span>Mute · music off</span></div>
+    <div class="key"><b>H</b><span>This card</span></div>
+  </div>
+  <p class="tagline" style="text-align:left;max-width:660px;margin-top:22px">
+    <em>Takedowns only work from behind</em>, close, and before he's suspicious.
+    <em>Racks break line of sight</em> for guards and cameras both.
+    <em>Crouching beats guards, not cameras</em> — they're overhead.
+    <em>The lighting panel</em> in the mechanical room blinds guards for about 25 seconds; cameras keep most of their range.
+    <em>The security NVR</em> in the north-west corner of the hall kills every camera for about 30 — but it sits directly under one, and pulling the uplink takes two seconds of standing still.
+    <em>A body left in the open</em> raises the floor on its own.
+    The keypad won't assemble until all three clue fragments are in hand.
+  </p>
+  <div class="btnRow">
+    <button class="go" id="helpCloseBtn">Back to it</button>
+    <button class="ghost" id="helpMenuBtn">Main screen</button>
   </div>
 </div>
 
@@ -456,6 +485,35 @@ addInteract(brk,{
     state.dark=true; state.darkT=26; brkLamp.material.color.setHex(0xff2418);
     ambient.intensity=0.20; overhead.intensity=0.06;
     logLine('Lights out. They can barely see — but somebody will come reset this.','good');
+  }
+});
+
+// security NVR — pull its uplink and the cameras go blind
+const nvr=new THREE.Group(); nvr.position.set(-13.4,0,-16.2); scene.add(nvr);
+const nvrBody=new THREE.Mesh(new THREE.BoxGeometry(0.5,1.1,1.2),MAT.panel);
+nvrBody.position.y=1.5; nvr.add(nvrBody);
+const nvrFace=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.9,1.0),MAT.rackFace);
+nvrFace.position.set(0.27,1.5,0); nvr.add(nvrFace);
+const nvrLeds=[];
+for(let i=0;i<4;i++){
+  const l=new THREE.Mesh(new THREE.BoxGeometry(0.03,0.07,0.07),new THREE.MeshBasicMaterial({color:0x4dff9e}));
+  l.position.set(0.31,1.82,-0.34+i*0.23); nvr.add(l); nvrLeds.push(l);
+}
+const nvrCable=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.9,6),
+  new THREE.MeshStandardMaterial({color:0xffb020,roughness:.8}));
+nvrCable.rotation.z=0.5; nvrCable.position.set(0.42,2.35,0.3); nvr.add(nvrCable);
+colliders.push({x:-13.4,z:-16.2,hw:0.35,hd:0.7});
+addInteract(nvrFace,{
+  name:'SECURITY NVR',
+  hint:()=> state.camsDown>0 ? 'Uplink already pulled. It reboots on its own.'
+                             : 'Every camera on the floor records back to this box.',
+  verb:'HOLD E — PULL UPLINK',
+  hold:2.2,
+  locked:()=> state.camsDown>0 ? 'Already down for '+Math.ceil(state.camsDown)+' more seconds.' : null,
+  act(){
+    state.camsDown=32;
+    nvrLeds.forEach(l=>l.material=new THREE.MeshBasicMaterial({color:0x3a1008}));
+    logLine('Uplink out. Every camera on the floor is blind for about half a minute.','good');
   }
 });
 
@@ -727,6 +785,23 @@ buildCam(34.6,8.0,3.5,0.4,9);
 
 function tickCams(dt){
   let worst=0, seen=false;
+  if(state.camsDown>0){
+    state.camsDown-=dt;
+    seccams.forEach(c=>{
+      c.sus=Math.max(0,c.sus-60*dt);
+      c.cone.visible=false;
+      c.dot.material=new THREE.MeshBasicMaterial({color:0x1a1f2c});
+      worst=Math.max(worst,c.sus);
+    });
+    if(state.camsDown<=0){
+      state.camsDown=0;
+      seccams.forEach(c=>{ c.cone.visible=true; });
+      nvrLeds.forEach(l=>l.material=new THREE.MeshBasicMaterial({color:0x4dff9e}));
+      logLine('NVR came back up. Cameras are live again.','warn');
+    }
+    state.camSees=false;
+    return worst;
+  }
   seccams.forEach(c=>{
     c.t+=dt;
     c.g.rotation.y=c.base+Math.sin(c.t*c.sweep)*0.9;
@@ -752,7 +827,7 @@ function tickCams(dt){
 }
 
 // ───────── state ─────────
-const state={playing:false,camSees:false,time:0,sus:0,peakSus:0,downed:0,dark:false,darkT:0,
+const state={playing:false,paused:false,camSees:false,camsDown:0,time:0,sus:0,peakSus:0,downed:0,dark:false,darkT:0,
   disc:false,hacked:false,hold:0,holdTarget:null,spotted:false,crouch:false};
 const P={x:11,z:15.5,vx:0,vz:0};
 
@@ -762,7 +837,7 @@ const H={
   susVal:document.getElementById('susVal'), susFill:document.getElementById('susFill'),
   susWhy:document.getElementById('susWhy'),
   tagClues:document.getElementById('tagClues'), tagDisc:document.getElementById('tagDisc'),
-  tagLights:document.getElementById('tagLights'),
+  tagLights:document.getElementById('tagLights'), tagCams:document.getElementById('tagCams'),
   prompt:document.getElementById('prompt'), reticle:document.getElementById('reticle'),
   log:document.getElementById('log'), stance:document.getElementById('stance'),
   progWrap:document.getElementById('progWrap'), progFill:document.getElementById('progFill'),
@@ -811,6 +886,8 @@ function paintHUD(){
   H.tagDisc.className='tag'+((state.disc||state.hacked)?' on':'');
   H.tagLights.textContent=state.dark?('DARK '+Math.ceil(state.darkT)+'s'):'LIGHTS ON';
   H.tagLights.className='tag'+(state.dark?' dark':'');
+  H.tagCams.textContent=state.camsDown>0?('CAMS DOWN '+Math.ceil(state.camsDown)+'s'):'CAMS LIVE';
+  H.tagCams.className='tag'+(state.camsDown>0?' dark':'');
   H.stance.innerHTML=state.crouch?'<b>CROUCHED</b>':'STANDING';
 }
 
@@ -829,8 +906,22 @@ function paintJournal(){
     : 'You have '+clueCount()+' of 3. The code will not assemble until all three are in hand.';
 }
 function toggleJournal(){
-  if(jEl.classList.contains('on')){ jEl.classList.remove('on'); if(state.playing) document.body.requestPointerLock(); }
-  else { paintJournal(); jEl.classList.add('on'); document.exitPointerLock(); }
+  if(jEl.classList.contains('on')){
+    jEl.classList.remove('on'); state.paused=false;
+    if(state.playing) document.body.requestPointerLock();
+  } else {
+    paintJournal(); jEl.classList.add('on'); state.paused=true; document.exitPointerLock();
+  }
+}
+const helpEl=document.getElementById('help');
+function toggleHelp(){
+  if(helpEl.classList.contains('hidden')){
+    helpEl.classList.remove('hidden'); state.paused=true; document.exitPointerLock();
+  } else {
+    helpEl.classList.add('hidden');
+    state.paused=false;
+    if(state.playing) document.body.requestPointerLock();
+  }
 }
 
 const docEl=document.getElementById('doc'), docHead=document.getElementById('docHead'), docBody=document.getElementById('docBody');
@@ -891,6 +982,7 @@ addEventListener('keydown',e=>{
   if(!fresh) return;
   if(k==='f') torch.visible=!torch.visible;
   if(k==='c'&&state.playing) state.crouch=!state.crouch;
+  if(k==='h'||k==='?'||k==='/'){ e.preventDefault(); toggleHelp(); }
   if(k==='m'){ muted=!muted; if(master) master.gain.value=muted?0:MIX.master; logLine(muted?'Audio muted.':'Audio live.'); }
   if(k==='n'){ musicOn=!musicOn; logLine(musicOn?'Score on.':'Score off.'); }
 });
@@ -1058,7 +1150,7 @@ function frame(now){
   rackLeds.forEach(r=>{ r.t+=dt;
     if(r.t>0.6+Math.random()){ r.t=0; r.led.material.color.setHex(Math.random()<0.85?0x4dff9e:0x123322); } });
 
-  if(state.playing){
+  if(state.playing && !state.paused){
     state.time+=dt;
     const {running,moving}=move(dt);
     scan();
@@ -1098,12 +1190,16 @@ function start(){
     gd.g.rotation.set(0,0,0); gd.g.position.set(gd.path[0][0],0,gd.path[0][1]);
     gd.cone.visible=true; gd.lamp.material=new THREE.MeshBasicMaterial({color:0x4dff9e});
   });
-  seccams.forEach(c=>{ c.sus=0; c.dot.material=new THREE.MeshBasicMaterial({color:0x5a1410}); });
+  state.camsDown=0;
+  seccams.forEach(c=>{ c.sus=0; c.cone.visible=true; c.dot.material=new THREE.MeshBasicMaterial({color:0x5a1410}); });
+  nvrLeds.forEach(l=>l.material=new THREE.MeshBasicMaterial({color:0x4dff9e}));
   P.x=11; P.z=15.5; P.vx=0; P.vz=0; yaw=Math.PI; pitch=0;
   torch.visible=false;
   menu.classList.add('hidden'); endS.classList.add('hidden');
+  helpEl.classList.add('hidden'); jEl.classList.remove('on'); state.paused=false;
   setObjective(); paintHUD();
   logLine('Inside. Three on the floor, three cameras on the ceiling.','warn');
+  logLine('The cameras all record back to one box in the hall. Find it.');
   document.body.requestPointerLock();
 }
 function finish(won,why){
@@ -1126,6 +1222,8 @@ document.getElementById('startBtn').onclick=start;
 document.getElementById('againBtn').onclick=start;
 document.getElementById('menuBackBtn').onclick=()=>location.href='index.html';
 document.getElementById('endBackBtn').onclick=()=>location.href='index.html';
+document.getElementById('helpCloseBtn').onclick=toggleHelp;
+document.getElementById('helpMenuBtn').onclick=()=>location.href='index.html';
 
 addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
