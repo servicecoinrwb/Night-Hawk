@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLEARANCE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,500;0,600;0,700;1,700&display=swap" rel="stylesheet">
+</head>
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="stealth-core.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   CLEARANCE — a federal records annexe.
+   Three prizes in three wings, and you choose how many to take.
+   Everything mechanical lives in stealth-core.js; this file is
+   just the building, the people in it, and what you came for.
+   ═══════════════════════════════════════════════════════════════ */
+
+const SCIF_CODE='7401';
+
+// mission state the core does not own
+const M={ badge:0, data:false, manifest:false, blueprints:false, codeKnown:false, scifOpen:false, out:false };
+function haul(){ return (M.data?1:0)+(M.manifest?1:0)+(M.blueprints?1:0); }
+
+Stealth.init({
+  name:'CLEARANCE',
+  sub:'NIGHT HAWK — FOURTH JOB',
+  bpm:100,
+  bg:0x05070c,
+  ambient:0.66,
+  mapScale:3.2,
+  blurb:"A federal records annexe with three things worth taking and one badge between you and any of them. "+
+        "<em>Encrypted user data</em> in the server hall, a <em>weapons manifest</em> in the registry, "+
+        "and <em>engineering drawings</em> in the vault. Take one and walk, or take all three and find out "+
+        "how long they let you stay. The vault is a shielded room — inside it your map is a dead screen.",
+  help:
+    "<em>Clearance is tiered.</em> Every guard carries a badge, but only the supervisor on the west "+
+    "side carries the one that opens the vault. Take the low badge first and the doors it opens tell you where he walks."+
+    "<em>The vault is shielded</em> — no map, no arcs, nothing but what you can see. Learn the room before you go in."+
+    "<em>The SCIF keypad code</em> is on the duty log in the watch office."+
+    "<em>Three prizes, one exit.</em> Nothing forces you to take all of them. Each one you lift raises the sweep."+
+    "<em>Takedowns from behind only</em>, close, before he is suspicious. Let one see you and he hunts for good.",
+  intro:[
+    {t:'Inside. Three wings, three things worth taking.',cls:'warn'},
+    {t:'You need a badge before any door means anything.'}
+  ],
+
+  levels:[{y:0,name:'ANNEXE'}],
+  plate:{x0:-24,x1:24,z0:-18,z1:18},
+  spawn:{x:0,z:15,y:0,yaw:Math.PI},
+
+  // ── HUD chips ──
+  tags:S=>[
+    {text:M.badge===0?'NO BADGE':M.badge===1?'BADGE · STAFF':'BADGE · SUPERVISOR',
+     cls:M.badge===2?'on':M.badge===1?'hot':''},
+    {text:M.codeKnown?'SCIF '+SCIF_CODE:'NO SCIF CODE', cls:M.codeKnown?'on':''},
+    {text:'HAUL '+haul()+'/3', cls:haul()===3?'on':haul()>0?'hot':''},
+    {text:S.mapDead?'NO SIGNAL':'MAP LIVE', cls:S.mapDead?'bad':''}
+  ],
+
+  notes:S=>[
+    {got:M.badge>=1, t:'Staff badge', s:'Opens the server hall and the registry. Not the vault.'},
+    {got:M.badge>=2, t:'Supervisor badge', s:'Opens everything, vault included.'},
+    {got:M.codeKnown, t:'Duty log, watch office', s:'SCIF keypad: '+SCIF_CODE+'.'},
+    {got:M.data, t:'Encrypted user data', s:'Copied off the server hall terminal.'},
+    {got:M.manifest, t:'Weapons manifest', s:'Lifted from the registry cabinet.'},
+    {got:M.blueprints, t:'Engineering drawings', s:'Out of the vault.'}
+  ],
+
+  objective:S=>{
+    if(M.badge===0) return {t:'Get a badge',
+      w:'Every door here reads one. The two floor guards carry staff badges — take either from behind and search him.'};
+    if(!M.codeKnown && !M.scifOpen) return {t:'Find the SCIF code',
+      w:'Watch office, north-east corner. It is on the duty log, because it is always on the duty log.'};
+    if(haul()===0) return {t:'Take something',
+      w:'Server hall west, registry south, vault north behind the SCIF door. The vault needs the supervisor badge.'};
+    if(!M.out) return {t:'Take more, or leave',
+      w:haul()+' of 3 in hand. Every one you lift makes them jumpier — the exit is the doors you came in by, south side.'};
+    return {t:'Out',w:'South doors.'};
+  },
+
+  mapMarks:(S,li)=>{
+    const m=[];
+    m.push({x:-17,z:-6,c:M.data?'rgba(77,255,158,.35)':'#4dff9e'});        // server terminal
+    m.push({x:6,z:13,c:M.manifest?'rgba(77,255,158,.35)':'#ffb020'});      // registry cabinet
+    m.push({x:0,z:-14,c:M.blueprints?'rgba(77,255,158,.35)':'#d8b25a'});   // vault
+    m.push({x:17,z:-13,c:M.codeKnown?'rgba(77,255,158,.35)':'#5fe6ff'});   // duty log
+    m.push({x:0,z:17,r:0.8,c:haul()>0?'#4dff9e':'rgba(143,154,184,.6)'});  // exit
+    return m;
+  },
+
+  reset:S=>{ M.badge=0; M.data=false; M.manifest=false; M.blueprints=false;
+             M.codeKnown=false; M.scifOpen=false; M.out=false; },
+
+  // the shielded room kills the map while you are inside it
+  tick:(dt,S,A)=>{
+    const inScif = Stealth.P.x>-7 && Stealth.P.x<7 && Stealth.P.z<-10;
+    if(inScif!==S.mapDead){
+      S.mapDead=inScif;
+      A.log(inScif?'Shielded room. Your map is a dead screen in here.':'Signal back.', inScif?'warn':'');
+    }
+  },
+
+  verdict:(won,why,S)=>{
+    if(won){
+      const n=haul();
+      return {title: S.downed===0?'GHOST':n===3?'EVERYTHING':'CLEAN',
+        text: n===3
+          ? 'All three out of the building in one night. Somebody is going to have a very bad morning explaining which of those mattered most.'
+          : n+' of 3, and out clean. The discipline to leave something behind is worth more than the thing you left.'};
+    }
+    return {title: why==='body'?'BODY FOUND':why==='alarm'?'LOCKDOWN':'MADE',
+      text: why==='body'
+        ? 'Somebody walked into one of your bodies. Put them where a route does not go — inside the wings, not in the concourse.'
+        : why==='alarm'
+          ? 'The sweep closed while you were still inside. Every prize you lift shortens that window.'
+          : 'A guard filled his meter. Once one properly sees you he hunts for the rest of the night — crouch, break sight, and stay behind the stacks.'};
+  },
+
+  // ═══════════ the building ═══════════
+  build(A){
+    const {box,slab,MAT,THREE,scene}=A;
+    const H=4.6;
+    slab(-24,24,-18,18,0,MAT.floor);
+    slab(-24,24,-18,18,H,MAT.wall);
+
+    // shell
+    box(0.5,H,36,MAT.wall,-24,H/2,0,true);
+    box(0.5,H,36,MAT.wall,24,H/2,0,true);
+    box(48,H,0.5,MAT.wall,0,H/2,-18,true);
+    [[-14,20],[14,20]].forEach(s=> box(s[1],H,0.5,MAT.wall,s[0],H/2,18,true));
+
+    // ── concourse pillars ──
+    for(const px of [-8,0,8]) for(const pz of [-2,6])
+      box(1.0,H,1.0,MAT.panel,px,H/2,pz,true);
+
+    // ── WEST WING: server hall ──
+    box(0.4,H,18,MAT.wall,-11,H/2,-6,true);
+    box(13,H,0.4,MAT.wall,-17.5,H/2,3,true);
+    const westDoor=box(0.24,3.0,2.2,MAT.steel,-11,1.5,2.0,true);
+    const westLamp=box(0.06,0.14,0.14,MAT.red,-10.85,2.35,2.0,false);
+    A.addInteract(westDoor,{
+      name:'SERVER HALL', hint:'Badge reader on the frame.', verb:'BADGE THROUGH',
+      locked:()=> M.badge>=1?null:'No badge. Any of them will do for this door.',
+      act(){ westDoor.position.x=-11.9; westDoor.rotation.y=1.2;
+        westLamp.material=MAT.green;
+        const c=A.colliders.find(c=>Math.abs(c.x+11)<0.3&&Math.abs(c.z-2)<0.3);
+        if(c){c.hw=0.05;c.hd=0.05;}
+        A.log('Server hall open.','good'); }
+    });
+    for(let i=0;i<5;i++){
+      const z=-13+i*2.6;
+      box(1.1,2.2,1.2,MAT.rack,-20,1.1,z,true,0.1);
+      box(1.1,2.2,1.2,MAT.rack,-14,1.1,z,true,0.1);
+      for(let k=0;k<5;k++){
+        const l=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.03,0.03),MAT.green);
+        l.position.set(-19.42,0.5+k*0.35,z); scene.add(l);
+      }
+    }
+    const term=box(1.0,0.6,0.08,MAT.dark,-17,1.25,-6.4,false);
+    const termGlow=box(0.9,0.5,0.02,MAT.cyan,-17,1.25,-6.35,false);
+    box(2.2,0.08,1.0,MAT.steel,-17,0.78,-6,true,0.1);
+    A.addInteract(termGlow,{
+      name:'RECORDS TERMINAL', hint:'Logged in. The whole user store is on it.',
+      verb:'HOLD E — COPY', hold:6.5,
+      locked:()=> M.data?'Already copied.':null,
+      act(){ M.data=true; termGlow.material=MAT.green;
+        A.log('User data copied. That is one.','good'); A.setObjective(); }
+    });
+
+    // ── SOUTH WING: registry ──
+    box(0.4,H,12,MAT.wall,11,H/2,10,true);
+    const regDoor=box(0.24,3.0,2.2,MAT.steel,11,1.5,6.0,true);
+    const regLamp=box(0.06,0.14,0.14,MAT.red,11.15,2.35,6.0,false);
+    A.addInteract(regDoor,{
+      name:'REGISTRY', hint:'Badge reader.', verb:'BADGE THROUGH',
+      locked:()=> M.badge>=1?null:'No badge.',
+      act(){ regDoor.position.set(11.9,1.5,6.9); regDoor.rotation.y=1.2;
+        regLamp.material=MAT.green;
+        const c=A.colliders.find(c=>Math.abs(c.x-11)<0.3&&Math.abs(c.z-6)<0.3);
+        if(c){c.hw=0.05;c.hd=0.05;}
+        A.log('Registry open.','good'); }
+    });
+    for(let i=0;i<4;i++) box(3.0,2.0,0.9,MAT.panel,16,1.0,9+i*2.2,true,0.1);
+    const cab=box(1.4,1.9,0.7,MAT.steel,6,0.95,13,true,0.1);
+    const cabLamp=box(0.1,0.1,0.06,MAT.amber,6,1.8,12.6,false);
+    A.addInteract(cab,{
+      name:'REGISTRY CABINET', hint:'Weapons manifest — inventory sheets, serial ranges, nothing you can build from.',
+      verb:'HOLD E — LIFT', hold:3.4,
+      locked:()=> M.manifest?'Emptied.':null,
+      act(){ M.manifest=true; cabLamp.material=MAT.green;
+        A.log('Manifest in the bag. That is two.','good'); A.setObjective(); }
+    });
+
+    // ── NORTH WING: the SCIF ──
+    box(0.4,H,8,MAT.wall,-7,H/2,-14,true);
+    box(0.4,H,8,MAT.wall,7,H/2,-14,true);
+    box(14,H,0.4,MAT.wall,0,H/2,-10,true);
+    const scifDoor=box(2.4,3.2,0.3,MAT.steel,0,1.6,-10,true);
+    const scifLamp=box(0.14,0.14,0.06,MAT.red,1.0,2.6,-9.8,false);
+    A.addInteract(scifDoor,{
+      name:'SHIELDED ROOM', hint:'Keypad and a supervisor reader. It wants both.',
+      verb:'ENTER CODE',
+      locked:()=>{
+        if(M.scifOpen) return 'Open.';
+        if(M.badge<2) return 'Reader wants supervisor clearance. A floor badge will not do it.';
+        if(!M.codeKnown) return 'No code. The duty log in the watch office has it.';
+        return null;
+      },
+      act(){ A.openPad('SHIELDED ROOM',SCIF_CODE,()=>{
+        M.scifOpen=true; scifLamp.material=MAT.green;
+        scifDoor.position.set(-2.2,1.6,-10.4); scifDoor.rotation.y=1.1;
+        const c=A.colliders.find(c=>Math.abs(c.x)<0.3&&Math.abs(c.z+10)<0.3);
+        if(c){c.hw=0.05;c.hd=0.05;}
+        A.log('Shielded room open. No map past this line.','good');
+      },'Four digits. From the duty log.'); }
+    });
+    const plans=box(1.2,0.9,0.5,MAT.panel,0,1.2,-14,true,0.1);
+    box(1.6,1.0,0.9,MAT.steel,0,0.5,-14,true,0.1);
+    A.addInteract(plans,{
+      name:'DRAWING TUBES', hint:'Engineering drawings. Rolled, tubed, numbered.',
+      verb:'HOLD E — TAKE', hold:4.2,
+      locked:()=> M.blueprints?'Taken.':null,
+      act(){ M.blueprints=true;
+        A.log('Drawings out of the vault. That is all three.','good'); A.setObjective(); }
+    });
+
+    // ── watch office ──
+    box(0.4,H,7,MAT.wall,13,H/2,-14.5,true);
+    box(11,H,0.4,MAT.wall,18.5,H/2,-11,true);
+    box(2.4,0.08,1.1,MAT.steel,17,0.78,-13,true,0.1);
+    const dutyLog=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.03,0.46),MAT.paper);
+    dutyLog.position.set(17,0.83,-13); dutyLog.rotation.y=0.3; scene.add(dutyLog);
+    A.addInteract(dutyLog,{
+      name:'DUTY LOG', hint:'Shift rota, and something written in the margin.', verb:'READ',
+      act(){ M.codeKnown=true;
+        A.showDoc('DUTY LOG — WATCH OFFICE',
+          'Mostly initials and times. Bottom of the page, in a different pen and circled: SHIELDED RM '+SCIF_CODE+
+          ' — third time this month somebody has forgotten it.');
+        A.log('SCIF code: '+SCIF_CODE,'good'); A.setObjective(); }
+    });
+
+    // ── exit ──
+    const exit=box(0.3,3.2,4.0,MAT.dark,0,1.6,17.9,false);
+    A.addInteract(exit,{
+      name:'SOUTH DOORS', hint:'The way you came in.', verb:'HOLD E — LEAVE', hold:1.4,
+      locked:()=> haul()>0?null:'Not empty handed.',
+      act(){ M.out=true; A.finish(true); }
+    });
+
+    // ── people ──
+    A.addGuard({name:'CONCOURSE', level:0, speed:1.5, badge:true, badgeColor:0x8f9ab8,
+      path:[[-6,12],[-6,-6],[6,-6],[6,12]],
+      onSearch(g){ if(M.badge<1){ M.badge=1;
+        A.showDoc('STAFF BADGE','Proximity card, photo worn off, printed band across the bottom: STAFF — WINGS ONLY. '+
+          'It will get you into the server hall and the registry. It will not get you into a shielded room.');
+        A.log('Staff badge. Wings are open to you now.','good'); A.setObjective(); }
+        else A.log('Another staff badge. You have one.'); }});
+
+    A.addGuard({name:'EAST', level:0, speed:1.6, badge:true, badgeColor:0x8f9ab8,
+      path:[[14,2],[20,2],[20,-8],[14,-8]],
+      onSearch(g){ if(M.badge<1){ M.badge=1;
+        A.showDoc('STAFF BADGE','STAFF — WINGS ONLY. Server hall and registry, nothing shielded.');
+        A.log('Staff badge.','good'); A.setObjective(); }
+        else A.log('Nothing you need.'); }});
+
+    A.addGuard({name:'SUPERVISOR', level:0, speed:1.35, badge:true, badgeColor:0xd8b25a,
+      path:[[-20,6],[-20,14],[-4,14],[-4,6]],
+      onSearch(g){ M.badge=2;
+        A.showDoc('SUPERVISOR BADGE','Gold band, no photo, and a second chip glued to the back. '+
+          'This is the one the shielded room reader is waiting for.');
+        A.log('Supervisor badge. The vault will read this.','good'); A.setObjective(); }});
+
+    A.addCamera({x:-22,y:3.4,z:8,base:2.3,sweep:0.4,range:11,level:0});
+    A.addCamera({x:22,y:3.4,z:8,base:-2.3,sweep:0.36,range:11,level:0});
+    A.addCamera({x:-11.6,y:3.4,z:-13,base:1.5,sweep:0.44,range:10,level:0});
+    A.addCamera({x:0,y:3.4,z:9,base:Math.PI,sweep:0.5,range:12,level:0});
+  }
+});
+</script>
+</body>
+</html>
