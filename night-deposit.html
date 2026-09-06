@@ -335,12 +335,15 @@ const MAT={
 // floor plates x -18..10, stair tower x 10..17, all z -14..14
 const LV=[{y:0,name:'GROUND'},{y:4.5,name:'SECURITY'},{y:9,name:'OFFICES'},{y:13.5,name:'ROOF'}];
 const PLATE={x0:-18,x1:10,z0:-14,z1:14};
-const TOWER={x0:10.6,x1:16.6,z0:-13,z1:13};
-// switchback: each ramp drops one level, alternating ends
+const TOWER={x0:10.0,x1:16.6,z0:-13,z1:13};
+const TMID=13.3;
+// Switchback. Each flight also gets its own HALF of the tower — west flights go up,
+// east flights go down. Without that the height test grabs whichever ramp is highest
+// and you climb the one you just came down.
 const RAMPS=[
-  {zTop:9,  yTop:13.5, zBot:-9, yBot:9},
-  {zTop:-9, yTop:9,    zBot:9,  yBot:4.5},
-  {zTop:9,  yTop:4.5,  zBot:-9, yBot:0}
+  {zTop:9,  yTop:13.5, zBot:-9, yBot:9,   x0:10.0, x1:TMID},
+  {zTop:-9, yTop:9,    zBot:9,  yBot:4.5, x0:TMID, x1:16.6},
+  {zTop:9,  yTop:4.5,  zBot:-9, yBot:0,   x0:10.0, x1:TMID}
 ];
 const LANDINGS=[
   {z0:9, z1:13,  y:13.5}, {z0:-13, z1:-9, y:9},
@@ -373,9 +376,12 @@ RAMPS.forEach(r=>{
     const z=r.zTop+(i+0.5)*dz;
     const t=(z-r.zTop)/(r.zBot-r.zTop);
     const y=r.yTop+(r.yBot-r.yTop)*t;
-    box(TOWER.x1-TOWER.x0,0.14,Math.abs(dz),MAT.steel,(TOWER.x0+TOWER.x1)/2,y-0.07,z,false);
+    box(r.x1-r.x0,0.14,Math.abs(dz),MAT.steel,(r.x0+r.x1)/2,y-0.07,z,false);
   }
 });
+
+// central stringer between the two flights
+box(0.18,15,26,MAT.steel,TMID,7.4,0,false);
 
 // exterior shell
 const TOP=18;
@@ -384,11 +390,15 @@ box(0.5,TOP,30,MAT.wall,16.9,TOP/2-0.2,0,true);
 box(36,TOP,0.5,MAT.wall,-0.6,TOP/2-0.2,-14.2,true);
 box(36,TOP,0.5,MAT.wall,-0.6,TOP/2-0.2,14.2,true);
 // glass curtain hint on the plate edge facing the tower, with a doorway per level
-LV.slice(0,3).forEach(L=>{
-  [[-13,7],[ -6,7],[2,7]].forEach(seg=>{
-    box(0.3,3.6,6,MAT.wall,10.2,L.y+1.8,seg[0],true);
+// wall between plate and tower, with the doorway cut at whichever end this level's
+// landing sits — ground and offices open north, security and roof open south
+LV.slice(0,3).forEach((L,i)=>{
+  const doorZ = (i%2===0) ? -11 : 11;
+  [[-14, doorZ-1.3],[doorZ+1.3, 14]].forEach(seg=>{
+    const d=seg[1]-seg[0];
+    if(d<=0.2) return;
+    box(0.3,3.6,d,MAT.wall,10.15,L.y+1.8,(seg[0]+seg[1])/2,true);
   });
-  box(0.3,3.6,6,MAT.wall,10.2,L.y+1.8,-11,true);
 });
 
 // ───────── level dressing ─────────
@@ -826,6 +836,7 @@ function groundAt(x,z,curY){
   if(inTower(x,z)){
     LANDINGS.forEach(l=>{ if(z>l.z0 && z<l.z1) take(l.y); });
     RAMPS.forEach(r=>{
+      if(x<r.x0-0.2 || x>r.x1+0.2) return;
       const lo=Math.min(r.zTop,r.zBot), hi=Math.max(r.zTop,r.zBot);
       if(z>lo && z<hi){
         const t=(z-r.zTop)/(r.zBot-r.zTop);
