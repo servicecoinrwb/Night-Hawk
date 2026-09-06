@@ -256,6 +256,7 @@
     <em>Crouching beats guards, not cameras</em> — they're overhead.
     <em>The lighting panel</em> in the mechanical room blinds guards for about 25 seconds; cameras keep most of their range.
     <em>The security NVR</em> in the north-west corner of the hall kills every camera for about 30 — but it sits directly under one, and pulling the uplink takes two seconds of standing still.
+    <em>Let one actually see you</em> and he locks on for good: he abandons his patrol, runs at twice his walking speed, and his suspicion never drops below halfway again. Lose him or put him down.
     <em>A body left in the open</em> gets walked to and called in — about six seconds once he sees it.
     <em>The mezzanine</em> is out of sight of every guard on the floor, but the cameras cover it.
     <em>The map</em> bottom-right turns with you and shows guard and camera arcs — dim ones are on the other level.
@@ -278,6 +279,7 @@
   <p id="endWhy"></p>
   <div class="btnRow">
     <button class="go" id="againBtn">Run it again</button>
+    <button class="go" id="continueBtn" style="display:none">Next leg</button>
     <button class="ghost" id="endBackBtn">Back to menu</button>
   </div>
 </div>
@@ -286,6 +288,26 @@
 <script>
 (function(){
 'use strict';
+
+// ───────── campaign chaining (shared shape across all three files) ─────────
+const CQ=new URLSearchParams(location.search);
+const CAMPAIGN=CQ.get('campaign')==='1';
+const LEG=+(CQ.get('leg')||0);
+const CTIME=+(CQ.get('t')||0);
+const CDOWN=+(CQ.get('down')||0);
+const CHAIN=[
+  'night-hawk.html?campaign=1&leg=1&dist=2600',
+  'dark-fiber.html?campaign=1&leg=2',
+  'night-hawk.html?campaign=1&leg=3&dist=3600',
+  'night-deposit.html?campaign=1&leg=4'
+];
+const LEGNAME=['','RUN OUT TO THE COLO','THE COLO','RUN ACROSS TOWN','THE BANK'];
+function nextLegURL(addTime,addDown){
+  const n=CHAIN[LEG];
+  if(!CAMPAIGN||!n) return null;
+  return n+'&t='+Math.round(CTIME+(addTime||0))+'&down='+(CDOWN+(addDown||0));
+}
+function legTotal(addTime){ return Math.round(CTIME+(addTime||0)); }
 
 // ───────── renderer ─────────
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
@@ -574,12 +596,16 @@ addInteract(nvrFace,{
 // ───────── vents ─────────
 // The only ground link between hall and mech room is the corridor, and guard C walks it.
 // These two ducts skip it — but you can only get in crouched.
+// each duct declares which way its mouth faces and exactly where it spits you out,
+// so nobody arrives inside a wall
 const VENTS=[
-  {x:12.6, y:3.4, z:-11.4, to:1, where:'the mechanical room'},
-  {x:19.4, y:0.0, z:8.2,  to:0, where:'the mezzanine deck'}
+  {x:12.6, y:3.4, z:-11.4, rot:0,           to:1, where:'the mechanical room',
+   exit:{x:12.6, y:3.4, z:-9.6,  yaw:Math.PI}},
+  {x:18.3, y:0.0, z:4.8,   rot:Math.PI/2,   to:0, where:'the mezzanine deck',
+   exit:{x:20.5, y:0.0, z:4.8,  yaw:-Math.PI/2}}
 ];
 VENTS.forEach((v,i)=>{
-  const g=new THREE.Group(); g.position.set(v.x,v.y,v.z); scene.add(g);
+  const g=new THREE.Group(); g.position.set(v.x,v.y,v.z); g.rotation.y=v.rot; scene.add(g);
   const frame=new THREE.Mesh(new THREE.BoxGeometry(1.3,1.0,0.16),MAT.duct);
   frame.position.y=0.62; g.add(frame);
   const mouth=new THREE.Mesh(new THREE.BoxGeometry(1.0,0.72,0.06),MAT.dark);
@@ -598,9 +624,10 @@ VENTS.forEach((v,i)=>{
     hold:1.9,
     locked:()=> state.crouch ? null : 'You are not fitting in there standing up. Crouch first.',
     act(){
-      const d=VENTS[v.to];
-      P.x=d.x; P.z=d.z+(d.y>1?1.6:1.6); P.y=d.y; P.vx=0; P.vz=0;
-      yaw = d.y>1 ? 0 : Math.PI;
+      const d=VENTS[v.to], e=d.exit;
+      const spot=safeSpot(e.x,e.z,e.y);
+      P.x=spot.x; P.z=spot.z; P.y=e.y; P.vx=0; P.vz=0;
+      yaw=e.yaw; pitch=0;
       state.crouch=true;
       logLine('Through the duct. You come out in '+d.where+'.','good');
     }
@@ -983,10 +1010,13 @@ function paintHUD(){
   H.susVal.textContent = s>=100?'MADE':s>62?'SPOTTED':s>18?'SUSPICIOUS':'UNSEEN';
   if(s>=100){ H.susWhy.textContent='They have you.'; H.susWhy.className='why bad'; }
   else if(s>18){
-    H.susWhy.textContent = state.camSees
-      ? 'A camera has you. Racks block it — get behind one.'
-      : 'Break line of sight and it bleeds back down.';
-    H.susWhy.className='why warn';
+    const hunted = guards.some(g=>!g.down && g.mode==='hunt');
+    H.susWhy.textContent = hunted
+      ? 'One of them is hunting you. He will not go back to his route — lose him or drop him.'
+      : state.camSees
+        ? 'A camera has you. Racks block it — get behind one.'
+        : 'Break line of sight and it bleeds back down.';
+    H.susWhy.className = hunted ? 'why bad' : 'why warn';
   }
   else if(state.crouch){ H.susWhy.textContent='Crouched. They need to be close to make you.'; H.susWhy.className='why ok'; }
   else { H.susWhy.textContent='Nobody is looking at you.'; H.susWhy.className='why'; }
@@ -1113,6 +1143,17 @@ renderer.domElement.addEventListener('click',()=>{
 });
 
 // ───────── movement + LOS ─────────
+// find the nearest clear standing spot to a target — belt and braces for duct exits
+function safeSpot(x,z,y){
+  if(!blocked(x,z,y)) return {x,z};
+  for(let r=0.5;r<=3.5;r+=0.5){
+    for(let a=0;a<Math.PI*2;a+=Math.PI/8){
+      const nx=x+Math.cos(a)*r, nz=z+Math.sin(a)*r;
+      if(!blocked(nx,nz,y)) return {x:nx,z:nz};
+    }
+  }
+  return {x,z};
+}
 function blocked(nx,nz,y){
   y = y||0;
   for(const c of colliders){
@@ -1172,18 +1213,22 @@ function tickGuards(dt,running,moving){
   let anySees=false, loudest=0;
   guards.forEach(gd=>{
     if(gd.down) return;
-    // patrol
-    if(gd.pause>0){ gd.pause-=dt; }
+    // patrol — unless he is hunting you, in which case the rounds are over
+    if(gd.pause>0 && gd.mode!=='hunt'){ gd.pause-=dt; }
     else {
-      const tgt=gd.mode==='investigate'&&gd.invest ? [gd.invest.x,gd.invest.z] : gd.path[gd.wp];
+      const hunting = gd.mode==='hunt';
+      const chase = hunting ? (gd.seesNow ? [P.x,P.z] : (gd.lastSeen?[gd.lastSeen.x,gd.lastSeen.z]:[P.x,P.z])) : null;
+      const tgt = hunting ? chase
+        : (gd.mode==='investigate'&&gd.invest ? [gd.invest.x,gd.invest.z] : gd.path[gd.wp]);
       const dx=tgt[0]-gd.g.position.x, dz=tgt[1]-gd.g.position.z;
       const d=Math.hypot(dx,dz);
       if(d<0.35){
-        if(gd.mode==='investigate'){ gd.investT+=0.0001; }
+        if(gd.mode==='hunt'){ /* standing on you — the meter finishes it */ }
+        else if(gd.mode==='investigate'){ gd.investT+=0.0001; }
         else { gd.wp=(gd.wp+1)%gd.path.length; gd.pause=0.6+Math.random()*1.4; }
       }
       else {
-        const sp=gd.speed*(gd.mode==='investigate'?1.75:(gd.sus>35?1.35:1));
+        const sp=gd.speed*(gd.mode==='hunt'?2.1:(gd.mode==='investigate'?1.75:(gd.sus>35?1.35:1)));
         gd.g.position.x+=dx/d*sp*dt; gd.g.position.z+=dz/d*sp*dt;
         gd.face=Math.atan2(dx,dz);
       }
@@ -1194,7 +1239,7 @@ function tickGuards(dt,running,moving){
       want=Math.atan2(P.x-gd.g.position.x, P.z-gd.g.position.z);
     }
     let diff=((want-gd.g.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI;
-    gd.g.rotation.y+=diff*Math.min(1,dt*5);
+    gd.g.rotation.y+=diff*Math.min(1,dt*(gd.mode==='hunt'?11:5));
 
     // vision
     const dx=P.x-gd.g.position.x, dz=P.z-gd.g.position.z, dist=Math.hypot(dx,dz);
@@ -1208,13 +1253,23 @@ function tickGuards(dt,running,moving){
     }
     // noise: running is heard through racks
     const heard = running && dist<8.5 && Math.abs((gd.level||0)-P.y)<2.2;
+    gd.seesNow=sees;
     if(sees||heard){
       anySees=anySees||sees;
       const rate = (sees? (state.crouch?16:30)*(1-dist/range*0.5) : 10);
       gd.sus=Math.min(100,gd.sus+rate*dt);
+      if(sees && gd.sus>58 && !gd.alerted){
+        gd.alerted=true; gd.mode='hunt'; gd.invest=null;
+        say_g(gd,'He has you. That one is done with his rounds — he is coming.','bad');
+        blip(140,0.5,'sawtooth',0.2);
+        setTimeout(()=>blip(112,0.6,'sawtooth',0.16),200);
+      }
     } else {
-      gd.sus=Math.max(0,gd.sus-11*dt);
+      // an alerted guard never settles all the way back down
+      gd.sus=Math.max(gd.alerted?46:0, gd.sus-(gd.alerted?4:11)*dt);
     }
+    // close enough to put hands on you
+    if(gd.mode==='hunt' && dist<1.5 && Math.abs((gd.level||0)-P.y)<1.6) gd.sus=100;
     // remember where you were when he loses you
     if(sees){ gd.lastSeen={x:P.x,z:P.z}; }
     else if(gd.mode==='patrol' && gd.sus>42 && gd.lastSeen){
@@ -1445,7 +1500,7 @@ function start(){
     gd.down=false; gd.searched=false; gd.sus=0; gd.wp=1; gd.pause=0;
     gd.g.rotation.set(0,0,0); gd.g.position.set(gd.path[0][0],gd.level||0,gd.path[0][1]);
     gd.mode='patrol'; gd.invest=null; gd.investT=0; gd.alarmT=0;
-    gd.found=false; gd.probe=false; gd.lastSeen=null;
+    gd.found=false; gd.probe=false; gd.lastSeen=null; gd.alerted=false; gd.seesNow=false;
     gd.cone.visible=true; gd.lamp.material=new THREE.MeshBasicMaterial({color:0x4dff9e});
     gd.loot.position.set(0,-100,0);
   });
@@ -1479,6 +1534,21 @@ function finish(won,why){
     : why==='body'
       ? 'A guard stood over one of your bodies long enough to call it in. Drop them out of the patrol lines — behind the racks, up on the deck, anywhere a route does not pass.'
       : 'A guard filled his meter and called it. Crouching cuts how fast they read you, racks break line of sight, and the lighting panel in the mechanical room buys you about twenty-five seconds of near-blindness.';
+  const cont=document.getElementById('continueBtn');
+  const nxt = won ? nextLegURL(state.time, state.downed) : null;
+  if(nxt){
+    cont.style.display='';
+    cont.textContent = LEG>=CHAIN.length-1 ? 'Finish the night' : 'Back to the car';
+    cont.onclick=()=>location.href=nxt;
+  } else if(won && CAMPAIGN){
+    cont.style.display='';
+    cont.textContent='Finish the night';
+    cont.onclick=()=>location.href='index.html?done=1&t='+legTotal(state.time)+'&down='+(CDOWN+state.downed);
+  } else cont.style.display='none';
+  if(CAMPAIGN){
+    document.getElementById('endWhy').textContent +=
+      '  Night so far: '+Math.floor(legTotal(state.time)/60)+'m '+(legTotal(state.time)%60)+'s across '+LEG+' legs.';
+  }
   endS.classList.remove('hidden');
 }
 document.getElementById('startBtn').onclick=start;
