@@ -156,9 +156,14 @@
   </footer>
 </div>
 
+<script src="night.js"></script>
 <script>
 (function(){
 'use strict';
+
+// campaign leg: one assigned contract, then hand back to the night
+const CAMP = Night.campaign && Night.q.get('job');
+let campStart = 0;
 
 // ═══════════ audio ═══════════
 let AC=null, master=null, on=false, hum=null, humGain=null;
@@ -413,16 +418,22 @@ function menu(){
   S.running=false; S.trace=0; el('trace').style.visibility='hidden'; paintHead();
   el('fLeft').textContent='READY';
   main.innerHTML='';
-  const k=document.createElement('div'); k.className='kick'; k.textContent='NIGHT HAWK — THE DESK';
+  const k=document.createElement('div'); k.className='kick';
+  k.textContent = CAMP ? ('RUN THE NIGHT  ·  LEG '+Night.leg+' / '+Night.count) : 'NIGHT HAWK — THE DESK';
   const h=document.createElement('h1'); h.textContent='COLD BOOT';
   const b=document.createElement('p'); b.className='blurb';
-  b.innerHTML='Six ways into a machine and a trace that never quite stops climbing. '+
-    'Pick a job, clear every layer before the session times out, and get out before they finish walking it back. '+
-    '<em>Fumbles raise the trace. The trace does not reset between layers.</em>';
+  b.innerHTML = CAMP
+    ? 'Leg '+Night.leg+' of '+Night.count+' — <em>'+Night.legLabel(Night.leg)+'</em>. '+
+      'One contract, then back to the car. Clear every layer before the session times out; '+
+      'the trace does not reset between them.'
+    : 'Six ways into a machine and a trace that never quite stops climbing. '+
+      'Pick a job, clear every layer before the session times out, and get out before they finish walking it back. '+
+      '<em>Fumbles raise the trace. The trace does not reset between layers.</em>';
   main.appendChild(k); main.appendChild(h); main.appendChild(b);
 
   const jobs=document.createElement('div'); jobs.className='jobs';
-  JOBS.forEach(j=>{
+  const list = CAMP ? JOBS.filter(j=>j.id===CAMP) : JOBS;
+  list.forEach(j=>{
     const d=document.createElement('div'); d.className='job'+(S.done.includes(j.id)?' done':'');
     d.innerHTML='<div><b>'+j.name+'</b><span>'+j.layers+' layers · '+j.time+'s each · '+j.who+'</span></div>'+
                 '<div class="pay">'+(S.done.includes(j.id)?'DONE':'+'+j.pay.toLocaleString())+'</div>';
@@ -433,14 +444,16 @@ function menu(){
 
   const m=document.createElement('div'); m.id='msg'; main.appendChild(m);
   const row=document.createElement('div'); row.className='row';
-  const deep=document.createElement('button'); deep.className='ghost';
-  deep.textContent='DEEP RUN — endless, no payout ceiling';
-  deep.onclick=()=>startJob({id:'deep',name:'DEEP RUN',layers:999,diff:1,time:24,pay:0,deep:true});
-  row.appendChild(deep);
-  if(S.done.length){
-    const reset=document.createElement('button'); reset.className='ghost';
-    reset.textContent='Clear the board'; reset.onclick=()=>{ S.done=[]; menu(); };
-    row.appendChild(reset);
+  if(!CAMP){
+    const deep=document.createElement('button'); deep.className='ghost';
+    deep.textContent='DEEP RUN — endless, no payout ceiling';
+    deep.onclick=()=>startJob({id:'deep',name:'DEEP RUN',layers:999,diff:1,time:24,pay:0,deep:true});
+    row.appendChild(deep);
+    if(S.done.length){
+      const reset=document.createElement('button'); reset.className='ghost';
+      reset.textContent='Clear the board'; reset.onclick=()=>{ S.done=[]; menu(); };
+      row.appendChild(reset);
+    }
   }
   main.appendChild(row);
 }
@@ -449,6 +462,7 @@ let tickIv=null;
 function startJob(job){
   initAudio(); if(AC&&AC.state==='suspended') AC.resume();
   S.contract=job; S.layer=0; S.trace=0; S.running=true;
+  if(!campStart) campStart=Date.now();
   el('trace').style.visibility='visible';
   paintHead();
   nextLayer();
@@ -531,8 +545,19 @@ function jobDone(){
     'Quiet bonus <em>+'+bonus.toLocaleString()+'</em> for what they did not manage to log.';
   const m=document.createElement('div'); m.id='msg';
   const row=document.createElement('div'); row.className='row';
-  const back=document.createElement('button'); back.className='go'; back.textContent='Back to the board';
-  back.onclick=menu; row.appendChild(back);
+  if(CAMP){
+    const spent=(Date.now()-campStart)/1000;
+    const nxt=Night.nextURL(spent,0);
+    const cont=document.createElement('button'); cont.className='go';
+    cont.textContent = Night.leg>=Night.count ? 'Finish the night' : 'Back to the car';
+    cont.onclick=()=>location.href=nxt;
+    row.appendChild(cont);
+    b.innerHTML+='<br>Night so far: <em>'+Math.floor(Night.total(spent)/60)+'m '+
+                 (Night.total(spent)%60)+'s</em> across '+Night.leg+' legs.';
+  } else {
+    const back=document.createElement('button'); back.className='go'; back.textContent='Back to the board';
+    back.onclick=menu; row.appendChild(back);
+  }
   main.appendChild(k); main.appendChild(h); main.appendChild(b); main.appendChild(m); main.appendChild(row);
   sweep(300,900,0.5,0.12);
   el('fLeft').textContent='CONTRACT CLOSED';
@@ -555,7 +580,8 @@ function burned(){
     'The trace never resets inside a contract — bail early and keep the layers you cleared.';
   const m=document.createElement('div'); m.id='msg';
   const row=document.createElement('div'); row.className='row';
-  const back=document.createElement('button'); back.className='go'; back.textContent='Back to the board';
+  const back=document.createElement('button'); back.className='go';
+  back.textContent = CAMP ? 'Try the contract again' : 'Back to the board';
   back.onclick=menu; row.appendChild(back);
   main.appendChild(k); main.appendChild(h); main.appendChild(b); main.appendChild(m); main.appendChild(row);
   sweep(700,90,0.8,0.18);
