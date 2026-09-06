@@ -75,6 +75,12 @@
   #vectorLine:empty{display:none}
   #vectorLine::before{content:'VECTOR ';color:rgba(95,230,255,.45);font-weight:700;font-size:11px;letter-spacing:1.4px}
 
+  #stageBanner{position:absolute;top:132px;left:50%;transform:translateX(-50%);
+    text-align:center;opacity:0;transition:opacity .5s;white-space:nowrap}
+  #stageBanner.on{opacity:1}
+  #stageBanner b{display:block;font-size:11px;font-weight:700;letter-spacing:5px;color:var(--steel)}
+  #stageBanner i{display:block;font-style:italic;font-size:38px;font-weight:700;letter-spacing:-1px;
+    color:#fff;text-shadow:0 0 26px rgba(176,38,255,.9),0 0 60px rgba(255,47,208,.5);margin-top:2px}
   #supplyCue{position:absolute;top:84px;left:50%;transform:translateX(-50%);
     font-size:13.5px;font-weight:700;color:var(--green);text-align:center;white-space:nowrap;
     border:1px solid rgba(77,255,158,.4);background:rgba(4,20,14,.78);padding:6px 16px;
@@ -199,6 +205,7 @@
     </div>
   </div>
 
+  <div id="stageBanner"></div>
   <div id="supplyCue"></div>
   <div class="pane" id="vectorPane"><div id="vectorLine"></div></div>
 </div>
@@ -319,19 +326,60 @@ document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0x0b0620, 70, 300);
-(function sky(){
-  const c=document.createElement('canvas'); c.width=8; c.height=256;
-  const ctx=c.getContext('2d'), g=ctx.createLinearGradient(0,0,0,256);
-  g.addColorStop(0,'#05060f'); g.addColorStop(.52,'#160a2e'); g.addColorStop(.74,'#3d0f4a');
-  g.addColorStop(.88,'#7a1550'); g.addColorStop(1,'#0b0620');
-  ctx.fillStyle=g; ctx.fillRect(0,0,8,256);
-  scene.background = new THREE.CanvasTexture(c);
-})();
+// repaintable gradient sky — stages cross-fade through it
+const skyCanvas=document.createElement('canvas'); skyCanvas.width=8; skyCanvas.height=256;
+const skyCtx=skyCanvas.getContext('2d');
+const skyTex=new THREE.CanvasTexture(skyCanvas);
+scene.background=skyTex;
+function paintSky(cols){
+  const g=skyCtx.createLinearGradient(0,0,0,256), at=[0,.5,.72,.88,1];
+  cols.forEach((c,i)=> g.addColorStop(at[i],'#'+c.getHexString()));
+  skyCtx.fillStyle=g; skyCtx.fillRect(0,0,8,256);
+  skyTex.needsUpdate=true;
+}
+
+// ───────── stage palettes: midnight through to sunrise ─────────
+const C=h=>new THREE.Color(h);
+const ZONES=[
+  {name:'MIDNIGHT',    sky:[0x05060f,0x160a2e,0x3d0f4a,0x7a1550,0x0b0620],
+   fog:0x0b0620, grid:0xb026ff, amb:0x4a4f7a, ambI:0.85, dir:0x9fb0ff, dirI:0.42, neon:0xb026ff},
+  {name:'NEON MILE',   sky:[0x090622,0x241048,0x5a1580,0xb0208c,0x140a30],
+   fog:0x1a0a38, grid:0xd23cff, amb:0x5b4d92, ambI:0.95, dir:0xb69cff, dirI:0.50, neon:0xff2fd0},
+  {name:'VIOLET HOUR', sky:[0x140b34,0x3a1668,0x7d21a0,0xd94a9e,0x24124a],
+   fog:0x2a1152, grid:0xe86bff, amb:0x6f5aa8, ambI:1.05, dir:0xd0b4ff, dirI:0.58, neon:0xb026ff},
+  {name:'FIRST LIGHT', sky:[0x241454,0x532292,0xa8399e,0xf06a7a,0x3a1c64],
+   fog:0x3f1c6a, grid:0xff7ae0, amb:0x8a6fb4, ambI:1.15, dir:0xffc8d8, dirI:0.66, neon:0xff5ac0},
+  {name:'SUNRISE',     sky:[0x3a2170,0x7333a6,0xc45298,0xffa25e,0x5a2f80],
+   fog:0x5c2b86, grid:0xffa7e8, amb:0xa284bd, ambI:1.28, dir:0xffd9b0, dirI:0.74, neon:0xffb020}
+];
+ZONES.forEach(z=>{ z.skyC=z.sky.map(C); z.fogC=C(z.fog); z.ambC=C(z.amb);
+                   z.dirC=C(z.dir); z.neonC=C(z.neon); z.gridC=C(z.grid); });
+const CUR={sky:ZONES[0].skyC.map(c=>c.clone()), fog:ZONES[0].fogC.clone(), amb:ZONES[0].ambC.clone(),
+           dir:ZONES[0].dirC.clone(), neon:ZONES[0].neonC.clone(), grid:ZONES[0].gridC.clone(),
+           ambI:0.85, dirI:0.42};
+paintSky(CUR.sky);
 
 const camera = new THREE.PerspectiveCamera(64, innerWidth/innerHeight, 0.1, 900);
 camera.position.set(0,4.4,12.5); camera.lookAt(0,1.6,-22);
-scene.add(new THREE.AmbientLight(0x4a4f7a, 0.85));
+const ambLight = new THREE.AmbientLight(0x4a4f7a, 0.85); scene.add(ambLight);
 const moon = new THREE.DirectionalLight(0x9fb0ff, 0.42); moon.position.set(-40,60,-20); scene.add(moon);
+
+// crossfade the whole world toward the stage palette
+function applyZone(dt){
+  const z=ZONES[Math.min(ZONES.length-1,S.zone)], k=Math.min(1,dt*0.55);
+  let moved=false;
+  CUR.sky.forEach((c,i)=>{ if(c.getHex()!==z.skyC[i].getHex()){ c.lerp(z.skyC[i],k); moved=true; } });
+  if(moved) paintSky(CUR.sky);
+  CUR.fog.lerp(z.fogC,k);  scene.fog.color.copy(CUR.fog);
+  CUR.amb.lerp(z.ambC,k);  ambLight.color.copy(CUR.amb);
+  CUR.dir.lerp(z.dirC,k);  moon.color.copy(CUR.dir);
+  CUR.grid.lerp(z.gridC,k);
+  CUR.neon.lerp(z.neonC,k);
+  CUR.ambI+=(z.ambI-CUR.ambI)*k; ambLight.intensity=CUR.ambI;
+  CUR.dirI+=(z.dirI-CUR.dirI)*k; moon.intensity=CUR.dirI;
+  if(typeof grid!=='undefined') grid.material.color.copy(CUR.grid);
+  if(typeof neonMat!=='undefined') neonMat.color.copy(CUR.neon);
+}
 
 const M = {
   road:new THREE.MeshStandardMaterial({color:0x121422,roughness:.95,metalness:.05}),
@@ -387,6 +435,19 @@ const lamps = recycler(22, i=>{
   const h=new THREE.Mesh(new THREE.BoxGeometry(1,0.22,0.5),M.lampOn); h.position.set(s*(CFG.roadHalf+0.3),8.8,0); g.add(h);
   const c=new THREE.Mesh(new THREE.ConeGeometry(3.4,8.6,10,1,true),M.beam); c.position.set(s*(CFG.roadHalf+0.3),4.5,0); g.add(c);
   return g; }, 46, 20);
+// roadside neon — the purple that sells the era
+const neonMat=new THREE.MeshBasicMaterial({color:0xb026ff});
+const neons = recycler(26, i=>{
+  const g=new THREE.Group(), sx=i%2?1:-1;
+  const bar=new THREE.Mesh(new THREE.BoxGeometry(0.22,4.6,0.22),neonMat);
+  bar.position.set(sx*(CFG.roadHalf+3.4),2.4,0); g.add(bar);
+  const cap=new THREE.Mesh(new THREE.BoxGeometry(2.2,0.22,0.22),neonMat);
+  cap.position.set(sx*(CFG.roadHalf+3.4),4.8,0); g.add(cap);
+  const low=new THREE.Mesh(new THREE.BoxGeometry(1.4,0.16,0.16),neonMat);
+  low.position.set(sx*(CFG.roadHalf+2.0),0.3,0); g.add(low);
+  return g;
+}, 30, 10);
+
 const mesas = recycler(16, i=>{
   const g=new THREE.Group();
   for(let k=0;k<3;k++){
@@ -854,6 +915,7 @@ const S = {
   spawnT:0, chaseT:0, supplyT:0, wetT:0, workT:0, tilt:0, scanPhase:0, docking:0,
   time:0, lastMin:0, bestTime:0,
   clock:0, stage:0, cpDist:0, cleared:false, bestCourse:0,
+  zone:0,
   bestScore:0
 };
 const keys={}, touch={left:false,right:false,boost:false,fire:false,brake:false};
@@ -954,6 +1016,14 @@ function paintHUD(){
     : S.combo+' clean passes. Next step at '+((Math.floor(S.combo/5)+1)*5)+'.';
 }
 
+const bannerEl=document.getElementById('stageBanner');
+let bannerT=null;
+function showStage(i){
+  bannerEl.innerHTML='<b>STAGE '+(i+1)+'</b><i>'+ZONES[i].name+'</i>';
+  bannerEl.classList.add('on');
+  clearTimeout(bannerT);
+  bannerT=setTimeout(()=>bannerEl.classList.remove('on'),2600);
+}
 function setCue(text, sub){
   if(!text){ el.cue.classList.remove('on'); return; }
   el.cue.classList.add('on');
@@ -1054,6 +1124,12 @@ function reset(){
   player.position.set(0,0,0); player.rotation.set(0,0,0); player.visible=true;
   vQueue=[]; vTarget=''; vTyped=''; vLine.textContent=''; setCue(null);
   buildChevs();
+  S.zone=0; bannerEl.classList.remove('on');
+  CUR.sky.forEach((c,i)=>c.copy(ZONES[0].skyC[i]));
+  CUR.fog.copy(ZONES[0].fogC); CUR.amb.copy(ZONES[0].ambC); CUR.dir.copy(ZONES[0].dirC);
+  CUR.grid.copy(ZONES[0].gridC); CUR.neon.copy(ZONES[0].neonC);
+  CUR.ambI=ZONES[0].ambI; CUR.dirI=ZONES[0].dirI;
+  paintSky(CUR.sky);
   el.timePane.classList.remove('tick');
   paintHUD();
 }
@@ -1283,6 +1359,14 @@ function frame(now){
       }
       if(S.clock<=0){ S.clock=0; endRun('clock'); return; }
     }
+    const zoneLen = S.gameMode==='trial' ? CFG.cpSpacing : 1800;
+    const wantZone = Math.min(ZONES.length-1, Math.floor(S.dist/zoneLen));
+    if(wantZone>S.zone){
+      S.zone=wantZone; showStage(S.zone);
+      blip(520,0.1,'triangle',0.13);
+      setTimeout(()=>blip(784,0.16,'triangle',0.12),110);
+    }
+
     const mins=Math.floor(S.time/60);
     if(mins>S.lastMin && S.gameMode!=='trial'){
       S.lastMin=mins;
@@ -1349,7 +1433,7 @@ function frame(now){
 
   // world scroll
   const dz=scroll*dt;
-  [dashes,rails,lamps,mesas].forEach(p=>{
+  [dashes,rails,lamps,mesas,neons].forEach(p=>{
     p.arr.forEach(o=>{ o.position.z+=dz; if(o.position.z>60) o.position.z-=p.total; });
   });
   grid.position.z=(grid.position.z+dz)%GRID_CELL;
@@ -1620,6 +1704,7 @@ function frame(now){
   let live=0; for(const c of chasers) if(!c.spun) live++;
   updateMusic(dt, idle, live);
 
+  applyZone(dt);
   tickVoice(dt);
   if(!idle) paintHUD();
   renderer.render(scene,camera);
