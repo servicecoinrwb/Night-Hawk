@@ -315,6 +315,7 @@ const CFG = {
   nearMissX:3.4,
   hull:3, oilMax:4,
   cpSpacing:1500, stages:5, startClock:62, cpBonus:26, crashPenalty:3,
+  brakeFloor:22, brakeCeil:28,
   fireRate:0.085, heatPerShot:5.2, heatCool:30, bulletSpeed:165
 };
 
@@ -1343,8 +1344,10 @@ function frame(now){
     if(wantFire) fire();
 
     let target=Math.min(CFG.maxSpeed,CFG.baseSpeed+S.dist*CFG.rampPerM)+(S.boosting?CFG.turboBoost:0);
-    if(braking) target=Math.max(24,target*0.40);
-    S.speed+=(target-S.speed)*dt*(braking?3.4:1.4);
+    // brake to an absolute crawl, not a fraction of however fast the ramp has pushed you —
+    // proportional braking stops being a brake once the ramp is high
+    if(braking) target=Math.max(CFG.brakeFloor, Math.min(target*0.40, CFG.brakeCeil));
+    S.speed+=(target-S.speed)*dt*(braking?4.2:1.4);
     S.dist+=S.speed*dt;
     S.score+=S.speed*dt*0.55*S.mult;
     S.time+=dt;
