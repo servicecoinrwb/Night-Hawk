@@ -90,12 +90,22 @@
   kbd{font-family:inherit;font-size:11.5px;font-weight:700;color:#fff;background:rgba(255,255,255,.08);
     border:1px solid rgba(255,255,255,.16);padding:2px 8px;margin-right:5px;display:inline-block}
 
+  #audio{position:fixed;top:18px;right:18px;z-index:5;font-family:inherit;font-size:11px;
+    font-weight:700;letter-spacing:1.6px;color:var(--steel);background:rgba(8,10,20,.7);
+    border:1px solid rgba(255,255,255,.14);padding:9px 15px;cursor:pointer;
+    transition:color .15s,border-color .15s}
+  #audio:hover{color:#fff;border-color:rgba(255,255,255,.4)}
+  #audio.on{color:var(--scan);border-color:rgba(255,36,24,.45);
+    box-shadow:0 0 22px rgba(255,36,24,.22)}
+  #audio i{font-style:normal;margin-right:7px}
   footer{margin-top:56px;padding-top:20px;border-top:1px solid rgba(255,255,255,.07);
     font-size:12px;font-weight:500;color:#3e465e;line-height:1.7}
   footer b{color:var(--steel);font-weight:600}
 </style>
 </head>
 <body>
+<button id="audio"><i>♪</i><span id="audioLabel">SOUND OFF</span></button>
+
 <div class="wrap">
 
   <header>
@@ -171,5 +181,133 @@
   </footer>
 
 </div>
+<script>
+(function(){
+'use strict';
+// Original synthwave loop, sequenced in Web Audio. Same engine as the driving game —
+// no files, nothing to load, and it only starts when you ask for it.
+const MIX={master:0.5, music:0.30};
+let AC=null, master=null, MUSIC=null, NOISE=null, on=false, builtIn=0;
+
+const btn=document.getElementById('audio'), label=document.getElementById('audioLabel');
+
+function noiseBuf(){
+  if(NOISE) return NOISE;
+  const n=AC.sampleRate*0.4; NOISE=AC.createBuffer(1,n,AC.sampleRate);
+  const d=NOISE.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
+  return NOISE;
+}
+const mn=m=>440*Math.pow(2,(m-69)/12);
+
+function init(){
+  if(AC) return;
+  AC=new (window.AudioContext||window.webkitAudioContext)();
+  master=AC.createGain(); master.gain.value=MIX.master; master.connect(AC.destination);
+  const bus=AC.createGain(); bus.gain.value=0; bus.connect(master);
+  const delay=AC.createDelay(1.2), fb=AC.createGain(), send=AC.createGain();
+  fb.gain.value=0.33; send.gain.value=0.28;
+  delay.connect(fb); fb.connect(delay); delay.connect(send); send.connect(bus);
+  MUSIC={bus,delay,step:0,next:0,bpm:118,cut:1400};
+  MUSIC.delay.delayTime.value=60/MUSIC.bpm/2;
+  setInterval(tick,25);
+}
+
+function kick(t){
+  const o=AC.createOscillator(), g=AC.createGain();
+  o.type='sine';
+  o.frequency.setValueAtTime(132,t); o.frequency.exponentialRampToValueAtTime(42,t+0.09);
+  g.gain.setValueAtTime(0.8,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.24);
+  o.connect(g); g.connect(MUSIC.bus); o.start(t); o.stop(t+0.26);
+}
+function snare(t){
+  const s=AC.createBufferSource(); s.buffer=noiseBuf();
+  const f=AC.createBiquadFilter(); f.type='bandpass'; f.frequency.value=1850; f.Q.value=0.7;
+  const g=AC.createGain();
+  g.gain.setValueAtTime(0.4,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.19);
+  s.connect(f); f.connect(g); g.connect(MUSIC.bus); s.start(t); s.stop(t+0.22);
+}
+function hat(t,v){
+  const s=AC.createBufferSource(); s.buffer=noiseBuf();
+  const f=AC.createBiquadFilter(); f.type='highpass'; f.frequency.value=7600;
+  const g=AC.createGain();
+  g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.0008,t+0.045);
+  s.connect(f); f.connect(g); g.connect(MUSIC.bus); s.start(t); s.stop(t+0.06);
+}
+function bass(f,t,dur){
+  const o=AC.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
+  const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=6;
+  lp.frequency.setValueAtTime(MUSIC.cut,t);
+  lp.frequency.exponentialRampToValueAtTime(280,t+dur);
+  const g=AC.createGain();
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(0.34,t+0.008);
+  g.gain.exponentialRampToValueAtTime(0.015,t+dur);
+  o.connect(lp); lp.connect(g); g.connect(MUSIC.bus); o.start(t); o.stop(t+dur+0.03);
+}
+function arp(f,t,dur){
+  const o=AC.createOscillator(); o.type='square'; o.frequency.value=f;
+  const g=AC.createGain();
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(0.11,t+0.005);
+  g.gain.exponentialRampToValueAtTime(0.0008,t+dur);
+  o.connect(g); g.connect(MUSIC.bus); g.connect(MUSIC.delay);
+  o.start(t); o.stop(t+dur+0.02);
+}
+function pad(f,t,dur){
+  const g=AC.createGain();
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(0.05,t+0.35);
+  g.gain.exponentialRampToValueAtTime(0.0008,t+dur);
+  const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1700; lp.Q.value=1.5;
+  lp.connect(g); g.connect(MUSIC.bus);
+  [-8,0,8].forEach(d=>{
+    const o=AC.createOscillator(); o.type='sawtooth'; o.frequency.value=f; o.detune.value=d;
+    o.connect(lp); o.start(t); o.stop(t+dur+0.05);
+  });
+}
+
+const PROG=[{r:45,t:[0,3,7]},{r:41,t:[0,4,7]},{r:43,t:[0,4,7]},{r:40,t:[0,3,7]}];
+const OCT=[0,0,12,0, 0,0,12,0, 0,12,0,0, 0,0,12,0];
+const SEQ=[0,1,2,1, 2,1,0,1];
+
+function step(st,t,spb){
+  const bar=(st>>4)&3, B=PROG[bar];
+  // layers arrive one loop at a time so it builds instead of dropping in cold
+  const L=builtIn;
+  bass(mn(B.r-12+OCT[st%16]), t, spb*0.92);
+  if(L>=1 && st%4===0) kick(t);
+  if(L>=1 && (st%16===4||st%16===12)) snare(t);
+  if(L>=1 && st%2===1) hat(t, L>=2?0.05:0.03);
+  if(L>=2 && st%2===0){
+    const i=(st>>1)%8;
+    arp(mn(B.r+12+B.t[SEQ[i]]+(i>3?12:0)), t, 0.2);
+  }
+  if(L>=3 && st%16===0) pad(mn(B.r+0), t, spb*15);
+  if(st===63) builtIn=Math.min(3,builtIn+1);
+}
+function tick(){
+  if(!MUSIC||!AC||AC.state!=='running') return;
+  const spb=60/MUSIC.bpm/4;
+  while(MUSIC.next < AC.currentTime+0.12){
+    if(MUSIC.next < AC.currentTime) MUSIC.next=AC.currentTime+0.02;
+    step(MUSIC.step, MUSIC.next, spb);
+    MUSIC.next+=spb;
+    MUSIC.step=(MUSIC.step+1)&63;
+  }
+  const target = on ? MIX.music : 0;
+  MUSIC.bus.gain.value += (target-MUSIC.bus.gain.value)*0.06;
+}
+
+function setOn(v){
+  on=v;
+  btn.classList.toggle('on',on);
+  label.textContent = on ? 'SOUND ON' : 'SOUND OFF';
+  if(on){ init(); if(AC.state==='suspended') AC.resume(); }
+}
+btn.onclick=()=>setOn(!on);
+addEventListener('keydown',e=>{ if(e.key.toLowerCase()==='m') setOn(!on); });
+})();
+</script>
 </body>
 </html>
