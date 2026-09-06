@@ -63,6 +63,13 @@
     font-size:11px;font-weight:700;letter-spacing:2.4px;color:var(--steel)}
   #stance b{color:var(--green)}
 
+  #mapWrap{position:absolute;right:22px;bottom:22px;width:150px;height:150px}
+  #minimap{width:150px;height:150px;border-radius:50%;
+    border:1px solid rgba(95,230,255,.24);background:rgba(3,8,14,.72);
+    box-shadow:0 0 26px rgba(0,0,0,.6), inset 0 0 26px rgba(95,230,255,.05)}
+  #mapLevel{position:absolute;left:50%;bottom:-16px;transform:translateX(-50%);
+    font-size:9.5px;font-weight:700;letter-spacing:2px;color:var(--steel);white-space:nowrap}
+  @media (max-width:760px){ #mapWrap{width:104px;height:104px} #minimap{width:104px;height:104px} }
   #progWrap{position:absolute;left:50%;bottom:26%;transform:translateX(-50%);width:min(400px,72vw);display:none}
   #progWrap.on{display:block}
   #progLabel{font-size:12px;font-weight:700;letter-spacing:1.4px;color:var(--cyan);text-align:center;margin-bottom:6px}
@@ -168,6 +175,10 @@
   <div id="progWrap"><div id="progLabel">WORKING</div><div id="progBar"><div id="progFill"></div></div></div>
   <div id="log"></div>
   <div id="stance">STANDING</div>
+  <div id="mapWrap">
+    <canvas id="minimap" width="240" height="240"></canvas>
+    <div id="mapLevel">GROUND</div>
+  </div>
 </div>
 
 <div id="vig"></div>
@@ -211,7 +222,7 @@
     <div class="key"><b>F</b><span>Flashlight. They can see it.</span></div>
     <div class="key"><b>M / N</b><span>Mute everything, or just the music.</span></div>
     <div class="key"><b>H</b><span>Quick check — pull this up any time.</span></div>
-    <div class="key"><b>Deck</b><span>Stairs at the south end of the east racks. Guards below can't see up.</span></div>
+    <div class="key"><b>Deck</b><span>Stairs at the far north end of the east racks. Guards below can't see up.</span></div>
     <div class="key"><b>Cameras</b><span>Sweeping, ceiling-mounted. Racks block them, crouching doesn't.</span></div>
   </div>
 
@@ -247,6 +258,7 @@
     <em>The security NVR</em> in the north-west corner of the hall kills every camera for about 30 — but it sits directly under one, and pulling the uplink takes two seconds of standing still.
     <em>A body left in the open</em> gets walked to and called in — about six seconds once he sees it.
     <em>The mezzanine</em> is out of sight of every guard on the floor, but the cameras cover it.
+    <em>The map</em> bottom-right turns with you and shows guard and camera arcs — dim ones are on the other level.
     <em>The ducts</em> run between the deck and the mechanical room and skip the guarded corridor — crouch to get in.
     The keypad won't assemble until all three clue fragments are in hand.
   </p>
@@ -352,13 +364,14 @@ box(0.4,ceilH,6,MAT.wall,18,ceilH/2,-5,true);
 box(0.4,ceilH,6,MAT.wall,18,ceilH/2,7,true);
 
 // ───────── mezzanine: a catwalk deck down the east side of the hall ─────────
-const DECK={y:3.4, x0:10.3, x1:13.8, z0:-18.5, z1:9.0};
-const STAIR={x0:10.3, x1:13.8, z0:9.0, z1:15.5};  // rises from the floor at z1 up to the deck at z0
+const DECK={y:3.4, x0:10.3, x1:13.8, z0:-12.0, z1:9.0};
+// stair sits at the far north end, well clear of the entrance door at z=15
+const STAIR={x0:10.3, x1:13.8, zLo:-18.6, zHi:-12.0};  // floor at zLo, deck height at zHi
 const platforms=[{x:(DECK.x0+DECK.x1)/2, z:(DECK.z0+DECK.z1)/2,
                   hw:(DECK.x1-DECK.x0)/2, hd:(DECK.z1-DECK.z0)/2, y:DECK.y}];
-function inStair(x,z){ return x>STAIR.x0 && x<STAIR.x1 && z>STAIR.z0 && z<STAIR.z1; }
+function inStair(x,z){ return x>STAIR.x0 && x<STAIR.x1 && z>STAIR.zLo && z<STAIR.zHi; }
 function stairY(z){
-  const t=(STAIR.z1-z)/(STAIR.z1-STAIR.z0);
+  const t=(z-STAIR.zLo)/(STAIR.zHi-STAIR.zLo);
   return Math.max(0,Math.min(DECK.y, t*DECK.y));
 }
 (function buildMezz(){
@@ -380,13 +393,13 @@ function stairY(z){
   colliders.push({x:DECK.x0-0.05,z:(DECK.z0+DECK.z1)/2,hw:0.28,hd:(DECK.z1-DECK.z0)/2,
                   top:DECK.y+1.1, floor:DECK.y-0.2});
   // stair treads
-  const n=13;
+  const n=13, run=STAIR.zHi-STAIR.zLo;
   for(let i=0;i<n;i++){
-    const z=STAIR.z1-(i+0.5)*((STAIR.z1-STAIR.z0)/n);
-    box(DECK.x1-DECK.x0,0.12,(STAIR.z1-STAIR.z0)/n,MAT.steel,(DECK.x0+DECK.x1)/2,stairY(z)-0.06,z,false);
+    const z=STAIR.zLo+(i+0.5)*(run/n);
+    box(DECK.x1-DECK.x0,0.12,run/n,MAT.steel,(DECK.x0+DECK.x1)/2,stairY(z)-0.06,z,false);
   }
-  // small office box on the deck, north end
-  box(0.14,2.4,4.0,MAT.wall,DECK.x0+0.1,DECK.y+1.2,-15.5,true);
+  // small office partition on the deck
+  box(0.14,2.4,4.0,MAT.wall,DECK.x0+0.1,DECK.y+1.2,-8.0,true);
 })();
 
 const grid=new THREE.GridHelper(38,38,0x243044,0x1a2231);
@@ -468,7 +481,7 @@ addInteract(sticky,{
 
 // clipboard in the mech room
 const clip=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.4,0.03),MAT.paper);
-clip.position.set(10.95,4.9,-15.5); clip.rotation.y=Math.PI/2; scene.add(clip);
+clip.position.set(10.95,4.9,-8.0); clip.rotation.y=Math.PI/2; scene.add(clip);
 addInteract(clip,{
   name:'SIGN-IN SHEET', hint:'Contractor log hanging in the deck office.', verb:'READ',
   act(){ takeClue('log'); }
@@ -562,7 +575,7 @@ addInteract(nvrFace,{
 // The only ground link between hall and mech room is the corridor, and guard C walks it.
 // These two ducts skip it — but you can only get in crouched.
 const VENTS=[
-  {x:12.6, y:3.4, z:-18.0, to:1, where:'the mechanical room'},
+  {x:12.6, y:3.4, z:-11.4, to:1, where:'the mechanical room'},
   {x:19.4, y:0.0, z:8.2,  to:0, where:'the mezzanine deck'}
 ];
 VENTS.forEach((v,i)=>{
@@ -672,7 +685,7 @@ function buildGuard(path,speed,name,level){
 buildGuard([[-7.5,-14],[-7.5,12],[0,12],[0,-14]],1.5,'A');
 buildGuard([[12.5,12],[12.5,-14],[7.5,-14],[7.5,12]],1.7,'B');
 buildGuard([[16,1],[22,1],[30,-4],[30,7],[22,1]],1.4,'C');
-buildGuard([[11.9,-17],[11.9,7],[11.9,-17]],1.25,'D',3.4);
+buildGuard([[11.9,-10.5],[11.9,7],[11.9,-10.5]],1.25,'D',3.4);
 
 // ───────── score: original, sequenced in Web Audio ─────────
 const MIX={master:0.5, music:0.34, musicMenu:0.20};
@@ -872,7 +885,7 @@ function buildCam(x,z,base,sweep,range){
   seccams.push(c); return c;
 }
 buildCam(-13.0,-18.0,0.7,0.5,11);
-buildCam(13.0,9.0,-2.5,0.44,11);
+buildCam(12.6,13.2,-2.4,0.44,11);
 buildCam(34.6,8.0,3.5,0.4,9);
 
 function tickCams(dt){
@@ -1290,8 +1303,100 @@ function tryUse(dt,tap){
   }
 }
 
+// ───────── minimap ─────────
+const mapCv=document.getElementById('minimap'), mx=mapCv.getContext('2d');
+const mapLevelEl=document.getElementById('mapLevel');
+const MAPR=120, MAPSCALE=3.5;          // canvas radius px, px per world unit
+const ROOMS=[
+  {x0:-14,x1:14,z0:-20,z1:18},         // data hall
+  {x0:14,x1:18,z0:-2,z1:4},            // corridor
+  {x0:18,x1:36,z0:-8,z1:10}            // mechanical room
+];
+function drawMap(){
+  mx.setTransform(1,0,0,1,0,0);
+  mx.clearRect(0,0,240,240);
+  mx.save();
+  mx.beginPath(); mx.arc(MAPR,MAPR,MAPR-2,0,Math.PI*2); mx.clip();
+  mx.translate(MAPR,MAPR);
+  mx.rotate(yaw);                       // player always points up
+  mx.scale(MAPSCALE,MAPSCALE);
+  mx.translate(-P.x,-P.z);
+
+  const line=(w)=>{ mx.lineWidth=w/MAPSCALE; };
+
+  // rooms
+  ROOMS.forEach(r=>{
+    mx.fillStyle='rgba(24,34,52,.85)';
+    mx.fillRect(r.x0,r.z0,r.x1-r.x0,r.z1-r.z0);
+    mx.strokeStyle='rgba(120,140,180,.55)'; line(1.6);
+    mx.strokeRect(r.x0,r.z0,r.x1-r.x0,r.z1-r.z0);
+  });
+
+  // racks
+  mx.fillStyle='rgba(70,86,120,.55)';
+  [-9.5,-5.5,5.5,9.5].forEach(rx=>{
+    for(let i=0;i<9;i++) mx.fillRect(rx-0.45,-15+i*3.4-0.55,0.9,1.1);
+  });
+
+  // mezzanine + stair
+  mx.fillStyle=P.y>1.7?'rgba(95,230,255,.20)':'rgba(95,230,255,.07)';
+  mx.fillRect(DECK.x0,DECK.z0,DECK.x1-DECK.x0,DECK.z1-DECK.z0);
+  mx.strokeStyle='rgba(95,230,255,.5)'; line(1.2);
+  mx.strokeRect(DECK.x0,DECK.z0,DECK.x1-DECK.x0,DECK.z1-DECK.z0);
+  mx.fillStyle='rgba(95,230,255,.13)';
+  mx.fillRect(STAIR.x0,STAIR.zLo,STAIR.x1-STAIR.x0,STAIR.zHi-STAIR.zLo);
+
+  const dot=(x,z,r,fill)=>{ mx.fillStyle=fill; mx.beginPath(); mx.arc(x,z,r,0,Math.PI*2); mx.fill(); };
+
+  // objectives — dim once done
+  dot(34.4,7.5,0.85, state.disc?'rgba(77,255,158,.35)':'#4dff9e');            // cabinet
+  dot(-4,-18.3,0.85, state.hacked?'rgba(77,255,158,.35)':'#ffb020');          // terminal
+  dot(-13.4,-16.2,0.7, state.camsDown>0?'rgba(95,230,255,.35)':'#5fe6ff');    // NVR
+  dot(35.8,-4,0.6,'#8f9ab8');                                                 // lighting panel
+  dot(13.7,15,0.75, state.hacked?'#4dff9e':'rgba(143,154,184,.6)');           // exit
+  VENTS.forEach(v=> dot(v.x,v.z,0.6,'rgba(95,230,255,.75)'));
+
+  // cameras — wedge showing where each is actually looking
+  seccams.forEach(c=>{
+    const a=c.g.rotation.y, live=state.camsDown<=0;
+    mx.fillStyle = !live ? 'rgba(60,70,90,.35)'
+      : c.sus>22 ? 'rgba(255,36,24,.28)' : 'rgba(255,90,60,.16)';
+    mx.beginPath(); mx.moveTo(c.g.position.x,c.g.position.z);
+    for(let t=-0.5;t<=0.5;t+=0.1)
+      mx.lineTo(c.g.position.x+Math.sin(a+t)*c.range, c.g.position.z+Math.cos(a+t)*c.range);
+    mx.closePath(); mx.fill();
+    dot(c.g.position.x,c.g.position.z,0.55, live?'#ff5a3c':'#3a4658');
+  });
+
+  // guards — wedge plus a body marker when down
+  guards.forEach(g=>{
+    const gx=g.g.position.x, gz=g.g.position.z, a=g.g.rotation.y;
+    const other = Math.abs((g.level||0)-P.y)>1.6;
+    if(g.down){ dot(gx,gz,0.8,other?'rgba(120,130,160,.5)':'rgba(160,170,200,.85)'); return; }
+    const col = g.sus>62?'#ff2418' : g.sus>22?'#ffb020' : '#4dff9e';
+    mx.globalAlpha = other?0.35:1;
+    mx.fillStyle = g.sus>62?'rgba(255,36,24,.22)':g.sus>22?'rgba(255,176,32,.18)':'rgba(77,255,158,.12)';
+    mx.beginPath(); mx.moveTo(gx,gz);
+    for(let t=-0.62;t<=0.62;t+=0.12) mx.lineTo(gx+Math.sin(a+t)*9, gz+Math.cos(a+t)*9);
+    mx.closePath(); mx.fill();
+    dot(gx,gz,0.85,col);
+    mx.globalAlpha=1;
+  });
+
+  mx.restore();
+
+  // player, fixed at centre facing up
+  mx.save(); mx.translate(MAPR,MAPR);
+  mx.fillStyle='#ffffff';
+  mx.beginPath(); mx.moveTo(0,-9); mx.lineTo(6.5,7); mx.lineTo(0,3.5); mx.lineTo(-6.5,7);
+  mx.closePath(); mx.fill();
+  mx.restore();
+
+  mapLevelEl.textContent = P.y>1.7 ? 'DECK' : 'GROUND';
+}
+
 // ───────── loop ─────────
-let last=performance.now();
+let last=performance.now(), mapT=0;
 function frame(now){
   requestAnimationFrame(frame);
   const dt=Math.min((now-last)/1000,0.05); last=now;
@@ -1317,6 +1422,7 @@ function frame(now){
     }
     tickGuards(dt,running,moving);
     paintHUD();
+    mapT-=dt; if(mapT<=0){ mapT=1/24; drawMap(); }
   }
   updateMusic(dt);
   renderer.render(scene,camera);
