@@ -55,6 +55,13 @@
   .run b{display:block;font-size:15px;font-weight:700;letter-spacing:3px;color:#fff}
   .run span{display:block;font-size:13.5px;font-weight:500;color:var(--steel);margin-top:6px;
     line-height:1.55;max-width:62ch}
+  #runLegs{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}
+  .legChip{font-size:10px;font-weight:700;letter-spacing:.8px;color:#6d7a94;
+    border:1px solid rgba(255,255,255,.10);padding:3px 8px}
+  .legChip.drive{color:#c88a8a;border-color:rgba(255,36,24,.22)}
+  .legChip.done{color:#4dff9e;border-color:rgba(77,255,158,.3)}
+  .legChip.now{color:#fff;border-color:rgba(255,255,255,.55);background:rgba(255,255,255,.06)}
+  .runBtns{display:flex;flex-direction:column;gap:8px;align-items:stretch}
   .runBtn{text-decoration:none;font-size:16px;font-weight:700;font-style:italic;white-space:nowrap;
     background:#fff;color:#0a0206;padding:13px 30px;
     clip-path:polygon(0 0,100% 0,calc(100% - 12px) 100%,0 100%);transition:transform .14s}
@@ -123,6 +130,7 @@
 </head>
 <body>
 <div id="done" style="display:none"></div>
+<script src="night.js"></script>
 <button id="audio"><i>♪</i><span id="audioLabel">SOUND OFF</span></button>
 
 <div class="wrap">
@@ -137,9 +145,10 @@
   <div class="run">
     <div>
       <b>RUN THE NIGHT</b>
-      <span>Six legs back to back. Quiet drive out to the colo, take it, then a hunted run across town to the annexe, another to the bank. The first drive is empty road; after the colo they know something happened and the interceptors are out. The clock counts across every leg.</span>
+      <span id="runBlurb">Every game, back to back, one clock.</span>
+      <div id="runLegs"></div>
     </div>
-    <a class="runBtn" href="night-hawk.html?campaign=1&amp;leg=1&amp;dist=2600">Start the night</a>
+    <div class="runBtns" id="runBtns"></div>
   </div>
 
   <div class="cards">
@@ -253,6 +262,35 @@
   </footer>
 
 </div>
+<script>
+(function(){
+  // ── campaign banner, built from the shared chain ──
+  const legs=document.getElementById('runLegs'), btns=document.getElementById('runBtns');
+  const saved=Night.load();
+  Night.CHAIN.forEach((L,i)=>{
+    const d=document.createElement('div');
+    d.className='legChip'+(L.drive?' drive':'')+
+      (saved&&i+1<saved.leg?' done':'')+(saved&&i+1===saved.leg?' now':'');
+    d.textContent=(i+1)+'. '+L.name+(L.drive?(L.drive.hostile?' · hunted':' · cruise'):'');
+    legs.appendChild(d);
+  });
+  document.getElementById('runBlurb').textContent =
+    Night.count+' legs, every game, one clock. The drives out are quiet; once they know '+
+    'something happened the interceptors come out. Each leg saves as you reach it.';
+  const mk=(txt,href,cls)=>{ const a=document.createElement('a');
+    a.className='runBtn'+(cls?' '+cls:''); a.href=href; a.textContent=txt; return a; };
+  if(saved){
+    btns.appendChild(mk('Continue — leg '+saved.leg,Night.resumeURL()));
+    const over=mk('Start over','#'); over.style.background='transparent';
+    over.style.color='#8f9ab8'; over.style.border='1px solid rgba(255,255,255,.2)';
+    over.onclick=e=>{ e.preventDefault(); Night.clear(); location.href=Night.startURL(); };
+    btns.appendChild(over);
+  } else {
+    btns.appendChild(mk('Start the night',Night.startURL()));
+  }
+})();
+</script>
+
 <script>
 (function(){
 'use strict';
