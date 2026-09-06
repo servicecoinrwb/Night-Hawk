@@ -231,7 +231,7 @@
 <div class="screen hidden" id="help">
   <h1 class="title" style="font-size:clamp(30px,6.5vw,54px)">QUICK CHECK</h1>
   <p class="tagline" style="text-align:left;max-width:680px">
-    <em>The route down:</em> roof plant intake → offices → security floor → ground. The stair tower on the east side switchbacks between every level.
+    <em>The route down:</em> roof plant intake → offices → security floor → ground. The tower has two flights side by side and they alternate — at every landing there is a lit sign over each one saying DOWN or UP and which floor it reaches. Read them; the flight nearest the door is not always the one you want.
     <em>The stair door to security is badged</em> — the keycard is on an office guard, so somebody has to go down.
     <em>The server room keypad code</em> is written up in the security office, because it always is.
     <em>Kill the alarm panel</em> on the security floor before you touch the racks and your escape window nearly doubles.
@@ -380,6 +380,35 @@ RAMPS.forEach(r=>{
   }
 });
 
+// ── stairwell signage: at every landing, say which flight goes where ──
+function levelName(y){ const L=LV.find(l=>Math.abs(l.y-y)<0.01); return L?L.name:'?'; }
+function makeSign(text,color,x,y,z){
+  const c=document.createElement('canvas'); c.width=256; c.height=64;
+  const g=c.getContext('2d');
+  const hex='#'+color.toString(16).padStart(6,'0');
+  g.fillStyle='#0b1018'; g.fillRect(0,0,256,64);
+  g.strokeStyle=hex; g.lineWidth=4; g.strokeRect(2,2,252,60);
+  g.fillStyle=hex; g.font='bold 27px sans-serif'; g.textAlign='center'; g.textBaseline='middle';
+  g.fillText(text,128,34);
+  const tex=new THREE.CanvasTexture(c);
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(2.3,0.58),
+    new THREE.MeshBasicMaterial({map:tex,transparent:true}));
+  m.position.set(x,y,z); m.rotation.y=-Math.PI/2; scene.add(m);
+  return m;
+}
+LANDINGS.forEach(l=>{
+  const cz=(l.z0+l.z1)/2;
+  // a floor placard so you always know where you are
+  makeSign(levelName(l.y), 0x8f9ab8, (TOWER.x0+TOWER.x1)/2, l.y+3.25, cz);
+  RAMPS.forEach(r=>{
+    const cx=(r.x0+r.x1)/2, inRange=z=>z>=l.z0-0.6&&z<=l.z1+0.6;
+    if(Math.abs(r.yTop-l.y)<0.01 && inRange(r.zTop))
+      makeSign('DOWN  '+levelName(r.yBot), 0xffb020, cx, l.y+2.45, r.zTop+Math.sign(cz-r.zTop)*1.2);
+    if(Math.abs(r.yBot-l.y)<0.01 && inRange(r.zBot))
+      makeSign('UP  '+levelName(r.yTop), 0x5fe6ff, cx, l.y+2.45, r.zBot+Math.sign(cz-r.zBot)*1.2);
+  });
+});
+
 // central stringer between the two flights
 box(0.18,15,26,MAT.steel,TMID,7.4,0,false);
 
@@ -521,7 +550,7 @@ addInteract(stairDoor,{
     state.doorOpen=true; doorLamp.material=MAT.green;
     stairDoor.position.x=11.4; stairDoor.rotation.y=1.2;
     const c=colliders.find(c=>c.door); if(c) c.hw=0.05, c.hd=0.05;
-    logLine('Door open. Tower runs all the way down from here.','good');
+    logLine('Door open. In the tower: east flight goes DOWN, west flight goes back up to the roof.','good');
   }
 });
 
