@@ -828,8 +828,10 @@ function move(dt){
   if(keys['w']) fz-=1; if(keys['s']) fz+=1;
   if(keys['a']) fx-=1; if(keys['d']) fx+=1;
   const len=Math.hypot(fx,fz)||1; fx/=len; fz/=len;
+  // camera looks down local -Z with rotation.y = yaw, so:
+  //   forward = (-sin, -cos)   right = (cos, -sin)
   const sin=Math.sin(yaw), cos=Math.cos(yaw);
-  const wx=fx*cos-fz*sin, wz=fx*sin+fz*cos;
+  const wx=fx*cos+fz*sin, wz=-fx*sin+fz*cos;
   P.vx+=(wx*spd-P.vx)*Math.min(1,dt*12);
   P.vz+=(wz*spd-P.vz)*Math.min(1,dt*12);
   const nx=P.x+P.vx*dt, nz=P.z+P.vz*dt;
