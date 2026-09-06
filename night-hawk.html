@@ -116,6 +116,10 @@
   button.ghost:focus-visible{outline:2px solid #fff;outline-offset:3px}
   button.go.cruise{background:var(--vector);box-shadow:0 0 34px rgba(95,230,255,.4);color:#02141a}
   button.go.cruise:hover,button.go.cruise:focus-visible{box-shadow:0 0 48px rgba(95,230,255,.65)}
+  button.go.trial{background:var(--amber);box-shadow:0 0 34px rgba(255,176,32,.4);color:#1a1002}
+  button.go.trial:hover,button.go.trial:focus-visible{box-shadow:0 0 48px rgba(255,176,32,.68)}
+  body.trial #gunMeter,body.trial #oilMeter,body.trial #killStat{display:none}
+  #timePane.low #timeVal{color:var(--scan);text-shadow:0 0 26px rgba(255,36,24,.8)}
   .modeNote{font-size:13px;font-weight:500;color:var(--steel);max-width:62ch;margin-top:16px;line-height:1.55}
   .modeNote b{color:#e8ecf7;font-weight:700}
   #modeBadge{font-size:11.5px;font-weight:700;letter-spacing:1.6px;color:var(--vector);margin-top:5px}
@@ -220,15 +224,18 @@
     <div class="key"><b>J</b><span>Hop. Clears a car, never a trailer.</span></div>
     <div class="key"><b>P / M / N</b><span>Pause, mute everything, or kill just the music.</span></div>
     <div class="key"><b>Esc</b><span>Back to this screen at any time.</span></div>
+    <div class="key"><b>H</b><span>Quick check — pull the controls up mid-run.</span></div>
   </div>
   <p class="tag" style="margin-top:16px">Shoot a civilian and you lose the whole combo. The gun is for the ones chasing you.</p>
 
   <div class="btnRow">
     <button class="go" id="startAction">Action run</button>
     <button class="go cruise" id="startCruise">Cruise run</button>
+    <button class="go trial" id="startTrial">Time attack</button>
   </div>
   <p class="modeNote"><b>Action</b> is the full thing: three hunter crews, your guns and oil, three panels of hull.
-  <b>Cruise</b> empties the road of hostiles and stows the weapons — five panels, just you, the traffic, the road work and the spills.</p>
+  <b>Cruise</b> empties the road of hostiles and stows the weapons — five panels, just you, the traffic, the road work and the spills.
+  <b>Time attack</b> is a five-stage course against a countdown: every checkpoint buys you 26 more seconds, every crash costs 3.</p>
   <p class="modeNote" style="margin-top:20px">Side job: <a href="dark-fiber.html" style="color:var(--vector);font-weight:700">DARK FIBER</a> — first-person, inside a data center, no car at all. &nbsp;·&nbsp; <a href="index.html" style="color:var(--steel);font-weight:700">Back to menu</a></p>
   <p class="foot">Original build. Not affiliated with any television or arcade property.</p>
 </div>
@@ -247,6 +254,34 @@
   <div class="btnRow">
     <button class="go" id="againBtn">Run it again</button>
     <button class="ghost" id="overBackBtn">Back to main screen</button>
+  </div>
+</div>
+
+<div class="screen hidden" id="help">
+  <h1 class="title" style="font-size:clamp(32px,7vw,64px)">QUICK<br>CHECK</h1>
+  <div class="keys">
+    <div class="key"><b>← →</b><span>Steer</span></div>
+    <div class="key"><b>Space</b><span>Machine gun — barrels jam if you hold it</span></div>
+    <div class="key"><b>↓</b><span>Brake — also tightens your steering</span></div>
+    <div class="key"><b>E</b><span>Drop oil behind you</span></div>
+    <div class="key"><b>Shift</b><span>Turbo</span></div>
+    <div class="key"><b>J</b><span>Hop — clears a car, never a trailer</span></div>
+    <div class="key"><b>P / M / N</b><span>Pause · mute · music off</span></div>
+    <div class="key"><b>H</b><span>This card</span></div>
+  </div>
+  <p class="modeNote" style="margin-top:22px;text-align:left;max-width:660px">
+    <b>Multiplier</b> climbs every 5 clean passes, up to x8 — a hit resets it.
+    <b>Never shoot civilians</b>: it costs the whole combo plus 250.
+    <b>Oil only catches tailgaters</b>, not the gun car out front.
+    <b>Barrels</b> cost the combo, the <b>arrow board</b> costs a panel.
+    <b>Spills</b> cut steering to a third — ease off, don't fight it.
+    <b>The supply semi</b> repairs, restocks and cools you — drive in straight or it wrecks you.
+    <b>Time attack:</b> five gates, 1,500m apart. Each one adds 26 seconds, each crash costs 3, and there are no hostiles — just you and the clock.
+    Every whole minute alive banks 1,000 × your multiplier.
+  </p>
+  <div class="btnRow">
+    <button class="go" id="helpCloseBtn">Back to it</button>
+    <button class="ghost" id="helpMenuBtn">Main screen</button>
   </div>
 </div>
 
@@ -272,6 +307,7 @@ const CFG = {
   gravity:34, jumpV:12.4,
   nearMissX:3.4,
   hull:3, oilMax:4,
+  cpSpacing:1500, stages:5, startClock:62, cpBonus:26, crashPenalty:3,
   fireRate:0.085, heatPerShot:5.2, heatCool:30, bulletSpeed:165
 };
 
@@ -436,6 +472,30 @@ function buildSupply(){
   g.visible=false; scene.add(g);
   return g;
 }
+
+// ───────── checkpoint gate ─────────
+const gate=new THREE.Group(); gate.visible=false; scene.add(gate);
+(function(){
+  const post=new THREE.MeshStandardMaterial({color:0x1c2130,roughness:.6,metalness:.5});
+  [-1,1].forEach(sx=>{
+    const p=new THREE.Mesh(new THREE.BoxGeometry(0.7,8,0.7),post);
+    p.position.set(sx*9.8,4,0); gate.add(p);
+  });
+  const beam=new THREE.Mesh(new THREE.BoxGeometry(20.4,1.4,0.7),post);
+  beam.position.set(0,7.3,0); gate.add(beam);
+  gate.userData.lamps=[];
+  for(let i=0;i<16;i++){
+    const l=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.34,0.1),
+      new THREE.MeshBasicMaterial({color:0xffb020}));
+    l.position.set(-9.4+i*1.25,7.3,0.42); gate.add(l); gate.userData.lamps.push(l);
+  }
+  // light curtain you drive through
+  const curtain=new THREE.Mesh(new THREE.PlaneGeometry(19.6,7),
+    new THREE.MeshBasicMaterial({color:0x4dff9e,transparent:true,opacity:0.09,
+      side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
+  curtain.position.set(0,3.5,0); gate.add(curtain);
+  gate.userData.curtain=curtain;
+})();
 
 // ───────── player ─────────
 const player = buildCar(0x0a0a10,{len:4.7,wid:2.05,spoiler:true,beams:true});
@@ -793,6 +853,7 @@ const S = {
   combo:0, bestCombo:0, mult:1, kills:0,
   spawnT:0, chaseT:0, supplyT:0, wetT:0, workT:0, tilt:0, scanPhase:0, docking:0,
   time:0, lastMin:0, bestTime:0,
+  clock:0, stage:0, cpDist:0, cleared:false, bestCourse:0,
   bestScore:0
 };
 const keys={}, touch={left:false,right:false,boost:false,fire:false,brake:false};
@@ -818,6 +879,7 @@ const el={
   comboNote:document.getElementById('comboNote'), speed:document.getElementById('speedVal'),
   dist:document.getElementById('distVal'), chevs:[...document.querySelectorAll('#hull .chev')],
   timePane:document.getElementById('timePane'), timeVal:document.getElementById('timeVal'),
+  timeLabel:document.getElementById('timeLabel'),
   fTime:document.getElementById('fTime'),
   hullNote:document.getElementById('hullNote'),
   heatFill:document.getElementById('heatFill'), heatPct:document.getElementById('heatPct'),
@@ -850,8 +912,16 @@ function paintHUD(){
   el.score.textContent=Math.floor(S.score).toLocaleString();
   el.mult.textContent='x'+S.mult;
   el.speed.innerHTML=Math.round(S.speed*1.62)+'<small>'+(S.braking?'braking':'mph')+'</small>';
-  el.timeVal.innerHTML=clockText(S.time,true);
+  if(S.gameMode==='trial'){
+    el.timeVal.innerHTML=clockText(Math.max(0,S.clock),true);
+    el.timePane.classList.toggle('low', S.clock<10);
+    el.dist.textContent='NEXT GATE '+Math.max(0,Math.ceil(S.cpDist-S.dist)).toLocaleString()+' m';
+    document.getElementById('modeBadge').textContent='TIME ATTACK · STAGE '+Math.min(CFG.stages,S.stage+1)+'/'+CFG.stages;
+  } else {
+    el.timeVal.innerHTML=clockText(S.time,true);
+  }
   el.dist.textContent=Math.floor(S.dist).toLocaleString()+' m';
+  
 
   el.chevs.forEach((c,i)=>c.classList.toggle('dead', i>=S.hull));
   el.hullNote.textContent = S.hull===S.hullMax ? 'Hull holding'
@@ -939,7 +1009,7 @@ function dockComplete(){
 
 // ───────── weapons ─────────
 function fire(){
-  if(S.gameMode==='cruise') return;
+  if(S.gameMode==='cruise'||S.gameMode==='trial') return;
   if(S.jammed || S.fireT>0) return;
   S.fireT = CFG.fireRate;
   S.heat += CFG.heatPerShot;
@@ -953,7 +1023,7 @@ function fire(){
   blip(240+Math.random()*60,0.05,'square',0.07);
 }
 function dropOil(){
-  if(S.gameMode==='cruise') return;
+  if(S.gameMode==='cruise'||S.gameMode==='trial') return;
   if(S.oil<=0){ blip(130,0.1,'square',0.09); say('No slicks left. The semi restocks them.',true); return; }
   S.oil--;
   const s=getSlick(); s.live=true; s.life=7.5; s.mesh.visible=true;
@@ -975,6 +1045,8 @@ function reset(){
   while(eBullets.length) releaseEBullet(0);
   supply.visible=false; supplyState={active:false,speed:0,docked:0,leaving:false};
   S.hullMax = S.gameMode==='cruise' ? 5 : CFG.hull;
+  S.clock = CFG.startClock; S.stage=0; S.cpDist=CFG.cpSpacing; S.cleared=false;
+  gate.visible=false;
   Object.assign(S,{speed:CFG.baseSpeed,dist:0,score:0,x:0,vx:0,y:0,vy:0,airborne:false,
     hull:S.hullMax,invuln:0,turbo:100,boosting:false,heat:0,jammed:false,fireT:0,oil:CFG.oilMax,
     slip:0,combo:0,bestCombo:0,mult:1,kills:0,time:0,lastMin:0,spawnT:0.8,chaseT:13,supplyT:52,
@@ -988,13 +1060,18 @@ function reset(){
 function startRun(mode){
   initAudio(); if(AC.state==='suspended') AC.resume();
   S.gameMode = mode || S.gameMode || 'action';
-  const cruise = S.gameMode==='cruise';
+  const cruise = S.gameMode==='cruise', trial = S.gameMode==='trial';
   document.body.classList.toggle('cruise', cruise);
-  document.getElementById('modeBadge').textContent = cruise ? 'CRUISE RUN' : '';
+  document.body.classList.toggle('trial', trial);
+  document.getElementById('modeBadge').textContent = cruise ? 'CRUISE RUN' : trial ? 'TIME ATTACK' : '';
+  document.getElementById('timeLabel').textContent = trial ? 'TIME LEFT' : 'TIME';
   reset();
   el.menu.classList.add('hidden'); el.over.classList.add('hidden'); el.paused.classList.add('hidden');
   S.mode='run';
-  if(cruise){
+  if(trial){
+    say('Time attack. Five checkpoints, and the clock is already running.');
+    say('Each gate buys you 26 seconds. Every crash costs three.');
+  } else if(cruise){
     say('Cruise run. Nobody is hunting you tonight.');
     say('Five panels, no weapons. Just traffic, road work and spills.');
   } else {
@@ -1011,20 +1088,37 @@ function endRun(cause){
   el.fDist.textContent=Math.floor(S.dist).toLocaleString();
   el.fKills.textContent=S.kills;
   el.fBest.textContent=S.bestCombo;
-  el.overTitle.textContent = cause==='rail'?'INTO THE RAIL':cause==='blade'?'CUT DOWN':'WRECKED';
+  el.overTitle.textContent = cause==='finish'?'COURSE CLEAR'
+    : cause==='clock'?'TIME OUT'
+    : cause==='rail'?'INTO THE RAIL':cause==='blade'?'CUT DOWN':'WRECKED';
   el.verdict.textContent =
-    cause==='rail' ? 'You pinned the guardrail. Steering carries momentum — tap it near the edge, don\'t hold it.'
+    cause==='finish' ? 'Five gates, '+clockText(S.time,false)+' on the road. Crashes cost you '+CFG.crashPenalty+' seconds each — a clean run is worth more than a fast one.'
+    : cause==='clock' ? 'Clock ran out '+Math.max(0,Math.ceil(S.cpDist-S.dist)).toLocaleString()+'m short of gate '+(S.stage+1)+'. Turbo between traffic, and stop braking for gaps you could thread.'
+    : cause==='rail' ? 'You pinned the guardrail. Steering carries momentum — tap it near the edge, don\'t hold it.'
     : cause==='blade' ? 'A blade car sat beside you too long. Shoot those or oil them; never match their speed.'
     : cause==='truck' ? 'A trailer. Hopping clears a car, never a semi — and the supply truck only takes you in dead straight.'
     : cause==='gunfire' ? 'Shot out. Gun cars sit out front and fire back down the road — change lanes the moment the muzzle lights up, or put four rounds into them.'
     : cause==='board' ? 'You hit an arrow board. Those close a lane a long way out — the barrels leading up to it are the warning.'
     : cause==='chaser' ? 'An interceptor put you in the wall. Three rounds kills one, or drop a slick and let it do the work.'
     : 'Traffic caught you flat. At this speed you pick the lane a full second early.';
-  const beat = S.score>S.bestScore; if(beat) S.bestScore=S.score;
-  const longest = S.time>S.bestTime; if(longest) S.bestTime=S.time;
-  el.bestNote.textContent = (beat?'New best score this session. ':'Best score this session: '+Math.floor(S.bestScore).toLocaleString()+'. ')
-    + (longest?'Longest run too.':'Longest run: '+clockText(S.bestTime,false)+'.')
-    + ' Both reset when you reload.';
+  if(S.gameMode==='trial'){
+    if(cause==='finish'){
+      const pb = !S.bestCourse || S.time<S.bestCourse;
+      if(pb) S.bestCourse=S.time;
+      el.bestNote.textContent = pb ? 'New best course time this session.'
+        : 'Best course time this session: '+clockText(S.bestCourse,false)+'.';
+    } else {
+      el.bestNote.textContent = S.bestCourse
+        ? 'Course best so far: '+clockText(S.bestCourse,false)+'. You did not finish this one.'
+        : 'Nobody has cleared all five gates yet this session.';
+    }
+  } else {
+    const beat = S.score>S.bestScore; if(beat) S.bestScore=S.score;
+    const longest = S.time>S.bestTime; if(longest) S.bestTime=S.time;
+    el.bestNote.textContent = (beat?'New best score this session. ':'Best score this session: '+Math.floor(S.bestScore).toLocaleString()+'. ')
+      + (longest?'Longest run too.':'Longest run: '+clockText(S.bestTime,false)+'.')
+      + ' Both reset when you reload.';
+  }
   el.over.classList.remove('hidden');
   setCue(null);
 }
@@ -1041,15 +1135,28 @@ addEventListener('keydown',e=>{
     if(k==='n'){ musicOn=!musicOn; say(musicOn?'Soundtrack on.':'Soundtrack off.',true); }
     if(k==='enter' && (S.mode==='menu'||S.mode==='over')) startRun(S.mode==='over'?S.gameMode:'action');
     if(k==='escape' && S.mode!=='menu') toMenu();
+    if(k==='h'||k==='?'||k==='/') toggleHelp();
   }
   keys[k]=true;
 });
 addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; });
 
+const helpEl=document.getElementById('help');
+function toggleHelp(){
+  if(helpEl.classList.contains('hidden')){
+    if(S.mode==='run'){ S.mode='paused'; if(engGain) engGain.gain.value=0; }
+    el.paused.classList.add('hidden');
+    helpEl.classList.remove('hidden');
+  } else {
+    helpEl.classList.add('hidden');
+    if(S.mode==='paused' && el.paused.classList.contains('hidden')) S.mode='run';
+  }
+}
 function toMenu(){
   S.mode='menu';
   reset();
   el.over.classList.add('hidden'); el.paused.classList.add('hidden');
+  document.getElementById('help').classList.add('hidden');
   el.menu.classList.remove('hidden');
   if(engGain) engGain.gain.value=0;
 }
@@ -1077,10 +1184,13 @@ if('ontouchstart' in window){
 }
 document.getElementById('startAction').onclick=()=>startRun('action');
 document.getElementById('startCruise').onclick=()=>startRun('cruise');
+document.getElementById('startTrial').onclick=()=>startRun('trial');
 document.getElementById('againBtn').onclick=()=>startRun(S.gameMode);
 document.getElementById('resumeBtn').onclick=togglePause;
 document.getElementById('overBackBtn').onclick=toMenu;
 document.getElementById('pauseBackBtn').onclick=toMenu;
+document.getElementById('helpCloseBtn').onclick=toggleHelp;
+document.getElementById('helpMenuBtn').onclick=toMenu;
 
 // ───────── helpers ─────────
 function overlaps(ax,az,ahw,ahl,bx,bz,bhw,bhl){
@@ -1089,6 +1199,7 @@ function overlaps(ax,az,ahw,ahl,bx,bz,bhw,bhl){
 function takeHit(cause){
   if(S.invuln>0||S.docking>0) return;
   S.hull--; S.invuln=1.7; S.combo=0; S.mult=1;
+  if(S.gameMode==='trial'){ S.clock=Math.max(0,S.clock-CFG.crashPenalty); }
   S.speed=Math.max(CFG.baseSpeed*0.55,S.speed*0.52);
   noiseHit(0.4,0.6); blip(90,0.3,'sawtooth',0.2);
   if(S.hull<=0){ endRun(cause); return; }
@@ -1142,8 +1253,38 @@ function frame(now){
     S.dist+=S.speed*dt;
     S.score+=S.speed*dt*0.55*S.mult;
     S.time+=dt;
+    if(S.gameMode==='trial'){
+      S.clock-=dt;
+      const togo=S.cpDist-S.dist;
+      if(togo<380){
+        gate.visible=true;
+        gate.position.z=-togo;
+        const ph=Math.floor(now/70)%gate.userData.lamps.length;
+        gate.userData.lamps.forEach((l,k)=> l.material.color.setHex(((k+ph)%4<2)?0xffb020:0x3a2a06));
+        gate.userData.curtain.material.opacity=0.09+Math.sin(now/160)*0.03;
+      } else gate.visible=false;
+
+      if(S.dist>=S.cpDist){
+        S.stage++;
+        if(S.stage>=CFG.stages){
+          S.cleared=true; gate.visible=false;
+          blip(660,0.12,'triangle',0.18);
+          setTimeout(()=>blip(990,0.2,'triangle',0.16),120);
+          endRun('finish'); return;
+        }
+        S.clock+=CFG.cpBonus;
+        S.cpDist+=CFG.cpSpacing;
+        S.score+=1500*S.mult;
+        el.timePane.classList.add('tick');
+        setTimeout(()=>el.timePane.classList.remove('tick'),900);
+        blip(720,0.1,'triangle',0.17);
+        setTimeout(()=>blip(1080,0.16,'triangle',0.14),100);
+        say('Checkpoint '+S.stage+' of '+CFG.stages+'. Plus '+CFG.cpBonus+' seconds.');
+      }
+      if(S.clock<=0){ S.clock=0; endRun('clock'); return; }
+    }
     const mins=Math.floor(S.time/60);
-    if(mins>S.lastMin){
+    if(mins>S.lastMin && S.gameMode!=='trial'){
       S.lastMin=mins;
       S.score+=1000*S.mult;
       el.timePane.classList.add('tick');
@@ -1185,11 +1326,11 @@ function frame(now){
       S.spawnT=(0.95-heatLvl*0.55)*(0.7+Math.random()*0.8)*(S.gameMode==='cruise'?0.78:1);
     }
     S.chaseT-=dt;
-    if(S.gameMode!=='cruise' && S.dist>700 && S.chaseT<=0 && chasers.length<4){
+    if(S.gameMode!=='cruise' && S.gameMode!=='trial' && S.dist>700 && S.chaseT<=0 && chasers.length<4){
       spawnChaser(); S.chaseT=(9-heatLvl*5.5)*(0.7+Math.random()*0.7);
     }
     S.supplyT-=dt;
-    if(S.supplyT<=0 && !supplyState.active && (S.gameMode!=='cruise' || S.hull<S.hullMax)){
+    if(S.supplyT<=0 && !supplyState.active && S.gameMode!=='trial' && (S.gameMode!=='cruise' || S.hull<S.hullMax)){
       callSupply(); S.supplyT=55+Math.random()*25;
     }
     S.wetT-=dt;
