@@ -209,6 +209,7 @@
     <div class="key"><b>Tab</b> <span>Case notes. Q works too.</span></div>
     <div class="key"><b>F</b><span>Flashlight. They can see it.</span></div>
     <div class="key"><b>M / N</b><span>Mute everything, or just the music.</span></div>
+    <div class="key"><b>Cameras</b><span>Sweeping, ceiling-mounted. Racks block them, crouching doesn't.</span></div>
   </div>
 
   <div class="sensRow">
@@ -600,6 +601,36 @@ function sTension(f,t,dur){
   o.start(t); o2.start(t); lfo.start(t);
   o.stop(t+dur+0.05); o2.stop(t+dur+0.05); lfo.stop(t+dur+0.05);
 }
+// tight kick
+function sKick(t,vol){
+  const o=AC.createOscillator(); o.type='sine';
+  o.frequency.setValueAtTime(128,t); o.frequency.exponentialRampToValueAtTime(46,t+0.07);
+  const g=AC.createGain();
+  g.gain.setValueAtTime(vol||0.55,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.19);
+  o.connect(g); g.connect(MUSIC.bus); o.start(t); o.stop(t+0.21);
+}
+// staccato 16th ostinato — the thing that makes it move
+function sTick(f,t){
+  const o=AC.createOscillator(); o.type='square'; o.frequency.value=f;
+  const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2200; lp.Q.value=2;
+  const g=AC.createGain();
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(0.075,t+0.004);
+  g.gain.exponentialRampToValueAtTime(0.0007,t+0.075);
+  o.connect(lp); lp.connect(g); g.connect(MUSIC.bus); o.start(t); o.stop(t+0.1);
+}
+// riser into the top of the bar when they're closing
+function sRiser(t,dur){
+  const o=AC.createOscillator(); o.type='sawtooth';
+  o.frequency.setValueAtTime(180,t); o.frequency.exponentialRampToValueAtTime(1500,t+dur);
+  const bp=AC.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=6;
+  bp.frequency.setValueAtTime(400,t); bp.frequency.exponentialRampToValueAtTime(3000,t+dur);
+  const g=AC.createGain();
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(0.075,t+dur*0.8);
+  g.gain.exponentialRampToValueAtTime(0.0008,t+dur);
+  o.connect(bp); bp.connect(g); g.connect(MUSIC.bus); o.start(t); o.stop(t+dur+0.03);
+}
 // heartbeat under pursuit
 function sPulse(t){
   const o=AC.createOscillator(); o.type='sine';
@@ -609,34 +640,50 @@ function sPulse(t){
   o.connect(g); g.connect(MUSIC.bus); o.start(t); o.stop(t+0.26);
 }
 
-// i - bVI7 - iv - V7b9, four bars, eight 8ths each
+// i - i - bVI - V7b9. Sixteen 16ths per bar, four bars.
 const BARS=[
-  {root:38, walk:[0,7,10,11], tri:[0,3,7,10]},
-  {root:34, walk:[0,4,7,9],   tri:[0,4,7,10]},
-  {root:31, walk:[0,7,10,12], tri:[0,3,7,10]},
-  {root:33, walk:[0,4,7,8],   tri:[0,4,7,13]}
+  {root:38, walk:[0,0,12,7,0,0,12,10], tri:[0,3,7,10]},
+  {root:38, walk:[0,0,12,7,0,10,12,14], tri:[0,3,7,14]},
+  {root:34, walk:[0,0,12,7,0,0,12,9],  tri:[0,4,7,11]},
+  {root:33, walk:[0,0,12,8,0,0,13,7],  tri:[0,4,7,13]}
 ];
+const OST=[0,7,12,7, 0,7,12,15, 0,7,12,7, 15,12,7,3];
 
 function playStep(st,t,spb){
-  const bar=(st>>3)&3, B=BARS[bar], i=MUSIC.intensity;
+  const bar=(st>>4)&3, B=BARS[bar], i=MUSIC.intensity;
   if(i<=0) return;
+  const b=st%16;
 
-  if(st%2===0) sBass(mn(B.root-12+B.walk[(st%8)>>1]), t, spb*1.75);
-  if(i>=1) sBrush(t, (st%2)?0.028:0.017);
-  if(i>=2 && (st%8===2||st%8===6)) sRim(t);
-  if(i>=2 && st%8===0) B.tri.forEach((iv,k)=> sVibe(mn(B.root+12+iv), t+k*0.02, 1.3));
-  if(i>=3 && st%8===0) sTension(mn(B.root-24), t, spb*7);
-  if(i>=4 && st%2===0) sPulse(t);
-  if(i>=4 && st%8===4) sVibe(mn(B.root+25), t, 0.5);
+  // driving 8th bass
+  if(b%2===0) sBass(mn(B.root-12+B.walk[b>>1]), t, spb*1.85);
+
+  // 16th ostinato is the pulse of the whole thing
+  if(i>=2) sTick(mn(B.root+12+OST[b]), t);
+
+  // kit
+  if(i>=1) sBrush(t, (b%2)?0.03:0.018);
+  if(i>=2 && (b===0||b===6||b===10)) sKick(t, i>=3?0.6:0.4);
+  if(i>=2 && (b===4||b===12)) sRim(t);
+  if(i>=3 && b===8) sKick(t,0.5);
+  if(i>=3 && b===14) sBrush(t,0.05);
+
+  // harmony
+  if(i>=2 && b===0) B.tri.forEach((iv,k)=> sVibe(mn(B.root+12+iv), t+k*0.018, 1.1));
+  if(i>=3 && b===0) sTension(mn(B.root-24), t, spb*15);
+
+  // full pursuit
+  if(i>=4 && b%4===0) sPulse(t);
+  if(i>=4 && b===8) sVibe(mn(B.root+25), t, 0.45);
+  if(i>=4 && bar===3 && b===8) sRiser(t, spb*8);
 }
 function schedule(){
   if(!MUSIC||!AC||AC.state!=='running') return;
-  const spb=60/MUSIC.bpm/2;
+  const spb=60/MUSIC.bpm/4;
   while(MUSIC.next < AC.currentTime+0.12){
     if(MUSIC.next < AC.currentTime) MUSIC.next=AC.currentTime+0.02;
     playStep(MUSIC.step, MUSIC.next, spb);
     MUSIC.next+=spb;
-    MUSIC.step=(MUSIC.step+1)&31;
+    MUSIC.step=(MUSIC.step+1)&63;
   }
 }
 function updateMusic(dt){
@@ -651,13 +698,61 @@ function updateMusic(dt){
   MUSIC.intensity=want;
   const vol = !musicOn?0 : (state.playing?MIX.music:MIX.musicMenu);
   MUSIC.bus.gain.value += (vol-MUSIC.bus.gain.value)*Math.min(1,dt*2);
-  const bpm = 92 + (state.playing? Math.min(34, s*0.42) : 0);
+  const bpm = 112 + (state.playing? Math.min(46, s*0.55) : 0);
   MUSIC.bpm += (bpm-MUSIC.bpm)*Math.min(1,dt*1.1);
   MUSIC.delay.delayTime.value=60/MUSIC.bpm/2;
 }
 
+// ───────── ceiling cameras ─────────
+const seccams=[];
+function buildCam(x,z,base,sweep,range){
+  const g=new THREE.Group(); g.position.set(x,3.5,z); scene.add(g);
+  const arm=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.5,0.1),MAT.panel); arm.position.y=0.42; g.add(arm);
+  const body=new THREE.Mesh(new THREE.BoxGeometry(0.32,0.24,0.62),MAT.panel); g.add(body);
+  const lens=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.14,10),MAT.dark);
+  lens.rotation.x=Math.PI/2; lens.position.z=0.36; g.add(lens);
+  const dot=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.07,0.07),MAT.red);
+  dot.position.set(0.13,0.16,0.1); g.add(dot);
+  const cone=new THREE.Mesh(new THREE.ConeGeometry(2.5,range,14,1,true),
+    new THREE.MeshBasicMaterial({color:0xff5a3c,transparent:true,opacity:0.05,
+      side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
+  cone.rotation.x=Math.PI/2; cone.position.z=range/2; cone.rotation.z=0; g.add(cone);
+  cone.position.y=-0.9;
+  const c={g,base,sweep,range,dot,cone,sus:0,t:Math.random()*6};
+  seccams.push(c); return c;
+}
+buildCam(-13.0,-18.0,-0.7,0.5,11);
+buildCam(13.0,9.0,2.5,0.44,11);
+buildCam(34.6,8.0,3.5,0.4,9);
+
+function tickCams(dt){
+  let worst=0, seen=false;
+  seccams.forEach(c=>{
+    c.t+=dt;
+    c.g.rotation.y=c.base+Math.sin(c.t*c.sweep)*0.9;
+    const dx=P.x-c.g.position.x, dz=P.z-c.g.position.z, dist=Math.hypot(dx,dz);
+    // overhead optics: crouching barely helps, darkness does a little, racks block completely
+    const range=c.range*(state.dark?0.62:1)*(state.crouch?0.9:1);
+    let sees=false;
+    if(dist<range){
+      const f=new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0),c.g.rotation.y);
+      const to=new THREE.Vector3(dx,0,dz).normalize();
+      if(f.dot(to)>0.88 && losClear(c.g.position.x,c.g.position.z,P.x,P.z)) sees=true;
+    }
+    if(sees){ c.sus=Math.min(100,c.sus+27*dt); seen=true; }
+    else c.sus=Math.max(0,c.sus-13*dt);
+    const col=c.sus>62?0xff2418:c.sus>22?0xffb020:0x5a1410;
+    c.dot.material=new THREE.MeshBasicMaterial({color:col});
+    c.cone.material.color.setHex(c.sus>22?col:0xff5a3c);
+    c.cone.material.opacity=sees?0.12:0.05;
+    worst=Math.max(worst,c.sus);
+  });
+  state.camSees=seen;
+  return worst;
+}
+
 // ───────── state ─────────
-const state={playing:false,time:0,sus:0,peakSus:0,downed:0,dark:false,darkT:0,
+const state={playing:false,camSees:false,time:0,sus:0,peakSus:0,downed:0,dark:false,darkT:0,
   disc:false,hacked:false,hold:0,holdTarget:null,spotted:false,crouch:false};
 const P={x:11,z:15.5,vx:0,vz:0};
 
@@ -701,7 +796,12 @@ function paintHUD(){
   H.susFill.style.transform='scaleX('+Math.min(1,s/100)+')';
   H.susVal.textContent = s>=100?'MADE':s>62?'SPOTTED':s>18?'SUSPICIOUS':'UNSEEN';
   if(s>=100){ H.susWhy.textContent='They have you.'; H.susWhy.className='why bad'; }
-  else if(s>18){ H.susWhy.textContent='Break line of sight and it bleeds back down.'; H.susWhy.className='why warn'; }
+  else if(s>18){
+    H.susWhy.textContent = state.camSees
+      ? 'A camera has you. Racks block it — get behind one.'
+      : 'Break line of sight and it bleeds back down.';
+    H.susWhy.className='why warn';
+  }
   else if(state.crouch){ H.susWhy.textContent='Crouched. They need to be close to make you.'; H.susWhy.className='why ok'; }
   else { H.susWhy.textContent='Nobody is looking at you.'; H.susWhy.className='why'; }
 
@@ -903,7 +1003,7 @@ function tickGuards(dt,running,moving){
     gd.cone.material.opacity = gd.sus>25?0.10:0.045;
   });
   state.spotted=anySees;
-  state.sus=loudest;
+  state.sus=Math.max(loudest, tickCams(dt));
   state.peakSus=Math.max(state.peakSus,state.sus);
   H.vig.style.opacity = state.sus>50 ? Math.min(0.8,(state.sus-50)/50) : 0;
   if(state.sus>=100) finish(false,'made');
@@ -998,11 +1098,12 @@ function start(){
     gd.g.rotation.set(0,0,0); gd.g.position.set(gd.path[0][0],0,gd.path[0][1]);
     gd.cone.visible=true; gd.lamp.material=new THREE.MeshBasicMaterial({color:0x4dff9e});
   });
+  seccams.forEach(c=>{ c.sus=0; c.dot.material=new THREE.MeshBasicMaterial({color:0x5a1410}); });
   P.x=11; P.z=15.5; P.vx=0; P.vz=0; yaw=Math.PI; pitch=0;
   torch.visible=false;
   menu.classList.add('hidden'); endS.classList.add('hidden');
   setObjective(); paintHUD();
-  logLine('Inside. Three on the floor. Nothing on you but your hands.','warn');
+  logLine('Inside. Three on the floor, three cameras on the ceiling.','warn');
   document.body.requestPointerLock();
 }
 function finish(won,why){
