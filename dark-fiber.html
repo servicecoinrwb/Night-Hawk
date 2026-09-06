@@ -571,11 +571,25 @@ function buildGuard(path,speed,name){
         gd.down=true; state.downed++;
         gd.g.rotation.x=Math.PI/2.1; gd.g.position.y=0.25;
         gd.cone.visible=false; gd.lamp.material=MAT.dark;
-        logLine('Guard down. He never turned around.','good');
+        // drop the search volume where the body actually comes to rest
+        gd.loot.position.set(gd.g.position.x, 0.55, gd.g.position.z+1.0);
+        logLine('Guard down. Press E on the body to search him.','good');
         setObjective();
       }
     }
   });
+  // searching aims at a big flat box on the floor, not the rotated body
+  const loot=new THREE.Mesh(new THREE.BoxGeometry(1.5,1.1,2.6),new THREE.MeshBasicMaterial({visible:false}));
+  loot.position.set(0,-100,0); scene.add(loot);
+  gd.loot=loot;
+  addInteract(loot,{
+    name:'GUARD — OUT COLD',
+    hint:()=> gd.searched ? 'Pockets already turned out.' : 'Still breathing. Pockets are fair game.',
+    verb:'SEARCH',
+    locked:()=> gd.searched ? 'Nothing left on him.' : null,
+    act(){ gd.searched=true; takeClue('badge'); }
+  });
+
   return gd;
 }
 buildGuard([[-7.5,-14],[-7.5,12],[0,12],[0,-14]],1.5,'A');
@@ -970,6 +984,7 @@ padEl.querySelectorAll('button').forEach(b=>{
 
 // ───────── input ─────────
 const keys={};
+let eTap=false;
 let yaw=Math.PI, pitch=0, locked=false, SENS=14;
 const sensEl=document.getElementById('sens'), sensVal=document.getElementById('sensVal');
 sensEl.oninput=()=>{ SENS=+sensEl.value; sensVal.textContent=SENS; };
@@ -980,6 +995,7 @@ addEventListener('keydown',e=>{
   const fresh=!keys[k];
   keys[k]=true;
   if(!fresh) return;
+  if(k==='e') eTap=true;
   if(k==='f') torch.visible=!torch.visible;
   if(k==='c'&&state.playing) state.crouch=!state.crouch;
   if(k==='h'||k==='?'||k==='/'){ e.preventDefault(); toggleHelp(); }
@@ -1123,7 +1139,7 @@ function scan(){
   H.prompt.innerHTML='<b>'+val(focus.name)+'</b><i>'+(why||val(focus.hint))+'</i>'
     +(why?'':'<em>'+val(focus.verb)+'</em>');
 }
-function tryUse(dt){
+function tryUse(dt,tap){
   if(!focus) return;
   if(focus.locked && focus.locked()) return;
   if(focus.hold){
@@ -1135,9 +1151,8 @@ function tryUse(dt){
     if(state.hold>=focus.hold){
       H.progWrap.classList.remove('on'); state.holdTarget=null; state.hold=0; focus.act();
     }
-  } else if(!focus.oneshot){
-    focus.oneshot=true; focus.act();
-    setTimeout(()=>{ focus.oneshot=false; },400);
+  } else if(tap){
+    focus.act();
   }
 }
 
@@ -1154,8 +1169,9 @@ function frame(now){
     state.time+=dt;
     const {running,moving}=move(dt);
     scan();
-    if(keys['e']) tryUse(dt);
+    if(keys['e']) tryUse(dt,eTap);
     else if(state.holdTarget){ state.holdTarget=null; state.hold=0; H.progWrap.classList.remove('on'); }
+    eTap=false;
 
     if(state.dark){
       state.darkT-=dt;
@@ -1189,6 +1205,7 @@ function start(){
     gd.down=false; gd.searched=false; gd.sus=0; gd.wp=1; gd.pause=0;
     gd.g.rotation.set(0,0,0); gd.g.position.set(gd.path[0][0],0,gd.path[0][1]);
     gd.cone.visible=true; gd.lamp.material=new THREE.MeshBasicMaterial({color:0x4dff9e});
+    gd.loot.position.set(0,-100,0);
   });
   state.camsDown=0;
   seccams.forEach(c=>{ c.sus=0; c.cone.visible=true; c.dot.material=new THREE.MeshBasicMaterial({color:0x5a1410}); });
