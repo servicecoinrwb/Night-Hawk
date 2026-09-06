@@ -283,7 +283,7 @@
     <b>Barrels</b> cost the combo, the <b>arrow board</b> costs a panel.
     <b>Spills</b> cut steering to a third — ease off, don't fight it.
     <b>The supply semi</b> repairs, restocks and cools you — drive in straight or it wrecks you.
-    <b>Time attack:</b> five gates, 1,500m apart. Each one adds 26 seconds and patches one panel. Each crash costs 3 seconds. No hostiles and no supply semi — the gates are the only repair.
+    <b>Time attack:</b> four gates, 1,500m apart — each adds 26 seconds and patches a panel. Clear the fourth and the trailer rolls out: the finish line is driving into the back of it, and the last leg has no gate to buy you time.
     Every whole minute alive banks 1,000 × your multiplier.
   </p>
   <div class="btnRow">
@@ -914,7 +914,7 @@ const S = {
   combo:0, bestCombo:0, mult:1, kills:0,
   spawnT:0, chaseT:0, supplyT:0, wetT:0, workT:0, tilt:0, scanPhase:0, docking:0,
   time:0, lastMin:0, bestTime:0,
-  clock:0, stage:0, cpDist:0, cleared:false, bestCourse:0,
+  clock:0, stage:0, cpDist:0, cleared:false, bestCourse:0, finishing:false,
   zone:0,
   bestScore:0
 };
@@ -977,8 +977,11 @@ function paintHUD(){
   if(S.gameMode==='trial'){
     el.timeVal.innerHTML=clockText(Math.max(0,S.clock),true);
     el.timePane.classList.toggle('low', S.clock<10);
-    el.dist.textContent='NEXT GATE '+Math.max(0,Math.ceil(S.cpDist-S.dist)).toLocaleString()+' m';
-    document.getElementById('modeBadge').textContent='TIME ATTACK · STAGE '+Math.min(CFG.stages,S.stage+1)+'/'+CFG.stages;
+    el.dist.textContent = S.finishing ? 'CATCH THE TRAILER'
+      : 'NEXT GATE '+Math.max(0,Math.ceil(S.cpDist-S.dist)).toLocaleString()+' m';
+    document.getElementById('modeBadge').textContent = S.finishing
+      ? 'TIME ATTACK · FINAL LEG'
+      : 'TIME ATTACK · STAGE '+Math.min(CFG.stages,S.stage+1)+'/'+CFG.stages;
   } else {
     el.timeVal.innerHTML=clockText(S.time,true);
   }
@@ -1066,13 +1069,20 @@ function releaseSlick(i){ const s=slicks[i]; s.live=false; s.mesh.visible=false;
 function callSupply(){
   if(supplyState.active) return;
   supplyState.active=true; supplyState.leaving=false; supplyState.docked=0;
-  supplyState.speed = 34;
+  // on the final leg it is running from you — you need the turbo to close
+  supplyState.speed = (S.gameMode==='trial' && S.finishing) ? 92 : 34;
   supply.visible=true;
   supply.position.set(CFG.laneX[1+((Math.random()*2)|0)], 0, -230);
   say('Supply semi ahead. Line up and drive into the back of it.',true);
   blip(620,0.2,'triangle',0.14); blip(880,0.24,'triangle',0.1);
 }
 function dockComplete(){
+  if(S.gameMode==='trial' && S.finishing){
+    S.cleared=true; supplyState.leaving=true;
+    S.score += 4000*S.mult;
+    endRun('finish');
+    return;
+  }
   S.hull=CFG.hull; S.oil=CFG.oilMax; S.heat=0; S.jammed=false;
   S.score += 500*S.mult;
   supplyState.leaving=true;
@@ -1118,7 +1128,7 @@ function reset(){
   while(eBullets.length) releaseEBullet(0);
   supply.visible=false; supplyState={active:false,speed:0,docked:0,leaving:false};
   S.hullMax = S.gameMode==='cruise' ? 5 : CFG.hull;
-  S.clock = CFG.startClock; S.stage=0; S.cpDist=CFG.cpSpacing; S.cleared=false;
+  S.clock = CFG.startClock; S.stage=0; S.cpDist=CFG.cpSpacing; S.cleared=false; S.finishing=false;
   gate.visible=false;
   Object.assign(S,{speed:CFG.baseSpeed,dist:0,score:0,x:0,vx:0,y:0,vy:0,airborne:false,
     hull:S.hullMax,invuln:0,turbo:100,boosting:false,heat:0,jammed:false,fireT:0,oil:CFG.oilMax,
@@ -1160,7 +1170,11 @@ function startRun(mode){
 }
 function endRun(cause){
   S.mode='over';
-  noiseHit(0.6,0.7); sweepDown(340,50,0.9);
+  if(cause==='finish'){
+    [0,140,280,460].forEach((d,i)=> setTimeout(()=>blip([784,988,1175,1568][i],0.22,'triangle',0.17),d));
+  } else {
+    noiseHit(0.6,0.7); sweepDown(340,50,0.9);
+  }
   if(engGain) engGain.gain.value=0;
   el.fScore.textContent=Math.floor(S.score).toLocaleString();
   el.fTime.textContent=clockText(S.time,false);
@@ -1171,8 +1185,10 @@ function endRun(cause){
     : cause==='clock'?'TIME OUT'
     : cause==='rail'?'INTO THE RAIL':cause==='blade'?'CUT DOWN':'WRECKED';
   el.verdict.textContent =
-    cause==='finish' ? 'Five gates, '+clockText(S.time,false)+' on the road. Crashes cost you '+CFG.crashPenalty+' seconds each — a clean run is worth more than a fast one.'
-    : cause==='clock' ? 'Clock ran out '+Math.max(0,Math.ceil(S.cpDist-S.dist)).toLocaleString()+'m short of gate '+(S.stage+1)+'. Turbo between traffic, and stop braking for gaps you could thread.'
+    cause==='finish' ? 'Four gates and into the back of the trailer at '+clockText(S.time,false)+'. Crashes cost '+CFG.crashPenalty+' seconds each — a clean run beats a fast one.'
+    : cause==='clock' ? (S.finishing
+        ? 'Clock died with the trailer in sight. The last leg has no gate to buy you time — you have to be in the back of that truck before it runs out.'
+        : 'Clock ran out '+Math.max(0,Math.ceil(S.cpDist-S.dist)).toLocaleString()+'m short of gate '+(S.stage+1)+'. Turbo between traffic, and stop braking for gaps you could thread.')
     : cause==='rail' ? 'You pinned the guardrail. Steering carries momentum — tap it near the edge, don\'t hold it.'
     : cause==='blade' ? 'A blade car sat beside you too long. Shoot those or oil them; never match their speed.'
     : cause==='truck' ? 'A trailer. Hopping clears a car, never a semi — and the supply truck only takes you in dead straight.'
@@ -1343,14 +1359,19 @@ function frame(now){
         gate.userData.curtain.material.opacity=0.09+Math.sin(now/160)*0.03;
       } else gate.visible=false;
 
-      if(S.dist>=S.cpDist){
+      if(S.dist>=S.cpDist && !S.finishing){
         S.stage++;
         if(S.stage>=CFG.stages){
-          S.cleared=true; gate.visible=false;
+          // final leg: the trailer is the finish line — catch it and get in the back
+          S.finishing=true; gate.visible=false;
+          S.clock+=CFG.cpBonus;
+          callSupply();
           blip(660,0.12,'triangle',0.18);
           setTimeout(()=>blip(990,0.2,'triangle',0.16),120);
-          endRun('finish'); return;
-        }
+          say('Last gate. Truck is rolling — get in the back of it.',true);
+          el.timePane.classList.add('tick');
+          setTimeout(()=>el.timePane.classList.remove('tick'),900);
+        } else {
         S.clock+=CFG.cpBonus;
         S.cpDist+=CFG.cpSpacing;
         S.score+=1500*S.mult;
@@ -1362,6 +1383,7 @@ function frame(now){
         setTimeout(()=>blip(1080,0.16,'triangle',0.14),100);
         say('Checkpoint '+S.stage+' of '+CFG.stages+'. Plus '+CFG.cpBonus+' seconds'
             +(patched?' and a panel back.':'.'));
+        }
       }
       if(S.clock<=0){ S.clock=0; endRun('clock'); return; }
     }
