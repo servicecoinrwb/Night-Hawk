@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DARK FIBER</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,500;0,600;0,700;1,700&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#04060a;--cyan:#5fe6ff;--green:#4dff9e;--amber:#ffb020;--red:#ff2418;--steel:#8f9ab8}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:var(--ink)}
+  body{font-family:'Chakra Petch',system-ui,sans-serif;color:#e8ecf7;-webkit-user-select:none;user-select:none}
+  canvas{display:block}
+
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+  .pane{position:absolute}
+
+  #objPane{top:18px;left:20px;max-width:330px}
+  #objLabel{font-size:10.5px;font-weight:700;letter-spacing:2.4px;color:var(--steel)}
+  #objText{font-size:18px;font-weight:700;color:#fff;line-height:1.25;margin-top:3px}
+  #objWhy{font-size:12.5px;font-weight:500;color:var(--cyan);margin-top:6px;line-height:1.4}
+
+  #statePane{top:18px;right:20px;text-align:right;width:250px}
+  .gTop{display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;letter-spacing:.6px;margin-bottom:4px}
+  .gTop span{color:var(--steel);font-weight:600}
+  .bar{height:7px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);position:relative;overflow:hidden}
+  .fill{position:absolute;inset:0;transform-origin:left center;transform:scaleX(0);transition:transform .08s linear}
+  #susFill{background:linear-gradient(90deg,#4dff9e,#ffb020 50%,#ff2418)}
+  .why{font-size:11.5px;font-weight:500;color:var(--steel);margin-top:5px;line-height:1.35;text-align:right}
+  .why.warn{color:var(--amber)}
+  .why.bad{color:var(--red)}
+  .why.ok{color:var(--green)}
+  #tags{margin-top:14px;display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+  .tag{font-size:10.5px;font-weight:700;letter-spacing:1px;padding:3px 9px;border:1px solid rgba(255,255,255,.16);color:var(--steel)}
+  .tag.on{color:var(--green);border-color:rgba(77,255,158,.5)}
+  .tag.dark{color:var(--cyan);border-color:rgba(95,230,255,.5)}
+
+  #reticle{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:6px;height:6px;border:1px solid rgba(255,255,255,.5);border-radius:50%;transition:all .1s}
+  #reticle.hot{border-color:var(--cyan);box-shadow:0 0 10px rgba(95,230,255,.8);transform:translate(-50%,-50%) scale(1.6)}
+  #reticle.kill{border-color:var(--red);box-shadow:0 0 12px rgba(255,36,24,.9);transform:translate(-50%,-50%) scale(2.1)}
+
+  #prompt{position:absolute;top:calc(50% + 40px);left:50%;transform:translateX(-50%);
+    text-align:center;font-size:14px;font-weight:600;display:none;max-width:430px}
+  #prompt.on{display:block}
+  #prompt b{display:block;color:#fff;font-size:15.5px;font-weight:700}
+  #prompt i{display:block;font-style:normal;color:var(--steel);font-size:12.5px;font-weight:500;margin-top:3px}
+  #prompt em{display:inline-block;font-style:normal;margin-top:7px;font-size:12px;font-weight:700;
+    letter-spacing:1px;color:var(--cyan);border:1px solid rgba(95,230,255,.35);padding:3px 10px}
+  #prompt.locked em{color:var(--amber);border-color:rgba(255,176,32,.35)}
+  #prompt.kill em{color:var(--red);border-color:rgba(255,36,24,.4)}
+
+  #log{position:absolute;left:20px;bottom:20px;width:min(420px,58vw)}
+  .line{font-size:13px;font-weight:600;color:var(--cyan);background:rgba(4,14,22,.72);
+    border-left:2px solid rgba(95,230,255,.5);padding:6px 12px;margin-top:5px}
+  .line.warn{color:var(--amber);border-left-color:rgba(255,176,32,.55)}
+  .line.bad{color:var(--red);border-left-color:rgba(255,36,24,.55)}
+  .line.good{color:var(--green);border-left-color:rgba(77,255,158,.55)}
+
+  #stance{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);
+    font-size:11px;font-weight:700;letter-spacing:2.4px;color:var(--steel)}
+  #stance b{color:var(--green)}
+
+  #progWrap{position:absolute;left:50%;bottom:26%;transform:translateX(-50%);width:min(400px,72vw);display:none}
+  #progWrap.on{display:block}
+  #progLabel{font-size:12px;font-weight:700;letter-spacing:1.4px;color:var(--cyan);text-align:center;margin-bottom:6px}
+  #progBar{height:9px;background:rgba(255,255,255,.08);border:1px solid rgba(95,230,255,.3);position:relative;overflow:hidden}
+  #progFill{position:absolute;inset:0;background:var(--cyan);transform-origin:left center;transform:scaleX(0)}
+
+  #vig{position:fixed;inset:0;pointer-events:none;z-index:11;opacity:0;transition:opacity .2s;
+    box-shadow:inset 0 0 180px 40px rgba(255,36,24,.55)}
+
+  .screen{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;padding:26px;text-align:center;
+    background:radial-gradient(ellipse at 50% 55%,rgba(6,26,38,.72),rgba(2,4,8,.96) 70%)}
+  .screen.hidden{display:none}
+  .title{font-size:clamp(40px,9vw,92px);font-weight:700;font-style:italic;letter-spacing:-2.5px;line-height:.88;color:#fff}
+  .sub{font-size:11px;font-weight:700;letter-spacing:4px;color:var(--cyan);margin-bottom:10px}
+  .tagline{font-size:15px;font-weight:600;color:var(--steel);max-width:60ch;margin-top:12px;line-height:1.55}
+  .tagline em{color:#e8ecf7;font-style:normal}
+  .keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:9px 22px;
+    margin:24px 0 4px;width:min(700px,92vw);text-align:left}
+  .key{font-size:13.5px;font-weight:500;color:var(--steel);display:flex;gap:9px;align-items:baseline}
+  .key b{font-weight:700;color:#fff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
+    padding:1px 7px;font-size:12px;white-space:nowrap}
+  .btnRow{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;align-items:center}
+  button.go{pointer-events:auto;margin-top:24px;font-family:inherit;font-size:18px;font-weight:700;font-style:italic;
+    color:#02141a;background:var(--cyan);border:0;padding:14px 40px;cursor:pointer;
+    clip-path:polygon(0 0,100% 0,calc(100% - 14px) 100%,0 100%);box-shadow:0 0 32px rgba(95,230,255,.4)}
+  button.go:hover{box-shadow:0 0 46px rgba(95,230,255,.7)}
+  button.ghost{pointer-events:auto;margin-top:24px;font-family:inherit;font-size:15px;font-weight:600;color:#cfd6e8;
+    background:transparent;border:1px solid rgba(255,255,255,.22);padding:13px 24px;cursor:pointer}
+  button.ghost:hover{border-color:rgba(255,255,255,.5);color:#fff}
+  .statRow{display:flex;gap:34px;margin:20px 0 2px;flex-wrap:wrap;justify-content:center}
+  .stat b{display:block;font-size:34px;font-weight:700;font-style:italic;color:#fff;line-height:1}
+  .stat span{font-size:12px;font-weight:600;color:var(--steel)}
+  #endWhy{font-size:15px;font-weight:600;color:var(--amber);margin-top:14px;max-width:54ch;line-height:1.5}
+  .sensRow{display:flex;align-items:center;gap:12px;margin-top:26px;pointer-events:auto}
+  .sensRow label{font-size:10.5px;font-weight:700;letter-spacing:2px;color:var(--steel)}
+  .sensRow input{width:200px;accent-color:var(--cyan)}
+  .sensRow span{font-size:13px;font-weight:700;color:#fff;width:26px;text-align:right}
+
+  /* journal */
+  #journal{position:fixed;inset:0;z-index:22;display:none;align-items:center;justify-content:center;
+    background:rgba(2,6,10,.88)}
+  #journal.on{display:flex}
+  .jBox{width:min(560px,90vw);border:1px solid rgba(95,230,255,.28);background:rgba(4,12,20,.98);padding:26px 28px}
+  .jBox h3{font-size:11px;font-weight:700;letter-spacing:3px;color:var(--cyan)}
+  .jItem{margin-top:16px;padding-left:14px;border-left:2px solid rgba(95,230,255,.35)}
+  .jItem b{display:block;font-size:14px;font-weight:700;color:#fff}
+  .jItem span{display:block;font-size:13px;font-weight:500;color:var(--steel);margin-top:4px;line-height:1.5}
+  .jItem.pending{border-left-color:rgba(255,255,255,.12)}
+  .jItem.pending b{color:#4b546b}
+  .jItem.pending span{color:#3c4457}
+  .jSolve{margin-top:22px;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);
+    font-size:14px;font-weight:600;color:var(--steel);line-height:1.5}
+  .jSolve b{color:var(--green);font-size:24px;font-style:italic;letter-spacing:6px;display:block;margin-top:6px}
+  .jHint{margin-top:18px;font-size:11.5px;color:#4b546b;font-weight:600;letter-spacing:.6px;text-align:center}
+
+  /* keypad */
+  #pad{position:fixed;inset:0;z-index:22;display:none;align-items:center;justify-content:center;background:rgba(2,6,10,.88)}
+  #pad.on{display:flex}
+  .padBox{width:min(320px,86vw);border:1px solid rgba(95,230,255,.3);background:rgba(4,14,22,.98);padding:22px}
+  .padTitle{font-size:12px;font-weight:700;letter-spacing:2px;color:var(--cyan);text-align:center}
+  .padHint{font-size:12px;font-weight:500;color:var(--steel);text-align:center;margin-top:6px;line-height:1.4}
+  #padVal{font-size:34px;font-weight:700;font-style:italic;text-align:center;letter-spacing:10px;color:#fff;margin:14px 0;min-height:40px}
+  #padVal.bad{color:var(--red)}
+  .padGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .padGrid button{font-family:inherit;font-size:20px;font-weight:700;color:#e8ecf7;background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.14);padding:12px 0;cursor:pointer}
+  .padGrid button:hover{background:rgba(95,230,255,.14);border-color:rgba(95,230,255,.5)}
+
+  /* readable */
+  #doc{position:fixed;inset:0;z-index:22;display:none;align-items:center;justify-content:center;background:rgba(2,6,10,.88)}
+  #doc.on{display:flex}
+  .docBox{width:min(430px,90vw);background:#f4f1e4;color:#20242e;padding:26px 28px;
+    box-shadow:0 20px 60px rgba(0,0,0,.6);transform:rotate(-1deg)}
+  .docBox h4{font-size:11px;letter-spacing:2px;color:#7a7566;font-weight:700}
+  .docBox p{font-size:15px;font-weight:600;margin-top:10px;line-height:1.55}
+  .docBox small{display:block;margin-top:16px;font-size:11.5px;color:#7a7566;font-weight:600}
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="pane" id="objPane">
+    <div id="objLabel">OBJECTIVE</div>
+    <div id="objText">—</div>
+    <div id="objWhy"></div>
+  </div>
+
+  <div class="pane" id="statePane">
+    <div class="gTop"><span>DETECTION</span><b id="susVal">UNSEEN</b></div>
+    <div class="bar"><div class="fill" id="susFill"></div></div>
+    <div class="why" id="susWhy">Nobody is looking at you.</div>
+    <div id="tags">
+      <div class="tag" id="tagClues">CLUES 0/3</div>
+      <div class="tag" id="tagDisc">NO DISC</div>
+      <div class="tag" id="tagLights">LIGHTS ON</div>
+    </div>
+  </div>
+
+  <div id="reticle"></div>
+  <div id="prompt"></div>
+  <div id="progWrap"><div id="progLabel">WORKING</div><div id="progBar"><div id="progFill"></div></div></div>
+  <div id="log"></div>
+  <div id="stance">STANDING</div>
+</div>
+
+<div id="vig"></div>
+
+<div id="journal"><div class="jBox">
+  <h3>CASE NOTES</h3>
+  <div id="jList"></div>
+  <div class="jSolve" id="jSolve"></div>
+  <div class="jHint">TAB to close</div>
+</div></div>
+
+<div id="pad"><div class="padBox">
+  <div class="padTitle" id="padTitle">SECURE CABINET</div>
+  <div class="padHint" id="padHint">Four digits.</div>
+  <div id="padVal"></div>
+  <div class="padGrid">
+    <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+    <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+    <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+    <button data-k="c">C</button><button data-k="0">0</button><button data-k="x">✕</button>
+  </div>
+</div></div>
+
+<div id="doc"><div class="docBox">
+  <h4 id="docHead">NOTE</h4>
+  <p id="docBody"></p>
+  <small>Click anywhere to put it back.</small>
+</div></div>
+
+<div class="screen" id="menu">
+  <div class="sub">NIGHT HAWK — SIDE JOB</div>
+  <h1 class="title">DARK<br>FIBER</h1>
+  <p class="tagline">Three guards, one data hall, and a cabinet you don't have the code to. <em>You didn't bring a gun.</em> Read the room, work out the code from what people left lying around, put the guards down from behind, take the disc and get it into a terminal before anybody notices the floor got quiet.</p>
+
+  <div class="keys">
+    <div class="key"><b>W A S D</b><span>Move. Mouse looks.</span></div>
+    <div class="key"><b>C</b><span>Crouch. Toggles — you don't hold it. Much harder to see.</span></div>
+    <div class="key"><b>Shift</b><span>Run. Loud — they hear you through the racks.</span></div>
+    <div class="key"><b>E</b><span>Use, take, or choke out from behind.</span></div>
+    <div class="key"><b>Tab</b> <span>Case notes. Q works too.</span></div>
+    <div class="key"><b>F</b><span>Flashlight. They can see it.</span></div>
+    <div class="key"><b>M / N</b><span>Mute everything, or just the music.</span></div>
+  </div>
+
+  <div class="sensRow">
+    <label for="sens">LOOK SENSITIVITY</label>
+    <input type="range" id="sens" min="4" max="34" step="1" value="14">
+    <span id="sensVal">14</span>
+  </div>
+
+  <div class="btnRow">
+    <button class="go" id="startBtn">Go in</button>
+    <button class="ghost" id="menuBackBtn">Back to menu</button>
+  </div>
+</div>
+
+<div class="screen hidden" id="end">
+  <h1 class="title" id="endTitle">GHOST</h1>
+  <div class="statRow">
+    <div class="stat"><b id="eTime">0:00</b><span>On site</span></div>
+    <div class="stat"><b id="eDown">0</b><span>Guards down</span></div>
+    <div class="stat"><b id="ePeak">0%</b><span>Peak detection</span></div>
+  </div>
+  <p id="endWhy"></p>
+  <div class="btnRow">
+    <button class="go" id="againBtn">Run it again</button>
+    <button class="ghost" id="endBackBtn">Back to menu</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+
+// ───────── renderer ─────────
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x04060a);
+scene.fog=new THREE.Fog(0x04060a,7,46);
+
+const camera=new THREE.PerspectiveCamera(74,innerWidth/innerHeight,0.05,220);
+camera.rotation.order='YXZ';
+scene.add(camera);
+
+const ambient=new THREE.AmbientLight(0x2b3350,0.75); scene.add(ambient);
+const overhead=new THREE.DirectionalLight(0x8fa4d8,0.34); overhead.position.set(0,14,4); scene.add(overhead);
+const torch=new THREE.SpotLight(0xdfeaff,1.4,24,0.5,0.45,1.4);
+torch.position.set(0,0,0.2); camera.add(torch); camera.add(torch.target);
+torch.target.position.set(0,0,-1); torch.visible=false;
+
+// ───────── materials ─────────
+const MAT={
+  floor:new THREE.MeshStandardMaterial({color:0x161b26,roughness:.9}),
+  mechFloor:new THREE.MeshStandardMaterial({color:0x1d2028,roughness:.95}),
+  wall:new THREE.MeshStandardMaterial({color:0x1b2130,roughness:.95}),
+  ceil:new THREE.MeshStandardMaterial({color:0x0d1119,roughness:1}),
+  rack:new THREE.MeshStandardMaterial({color:0x0e1119,roughness:.55,metalness:.5}),
+  rackFace:new THREE.MeshStandardMaterial({color:0x141926,roughness:.4,metalness:.6}),
+  steel:new THREE.MeshStandardMaterial({color:0x39415a,roughness:.5,metalness:.7}),
+  duct:new THREE.MeshStandardMaterial({color:0x4a5468,roughness:.7,metalness:.4}),
+  pipeBlue:new THREE.MeshStandardMaterial({color:0x2f5f92,roughness:.5,metalness:.5}),
+  panel:new THREE.MeshStandardMaterial({color:0x2a3040,roughness:.6,metalness:.5}),
+  guard:new THREE.MeshStandardMaterial({color:0x1e2433,roughness:.8}),
+  guardVest:new THREE.MeshStandardMaterial({color:0x2c3446,roughness:.7}),
+  skin:new THREE.MeshStandardMaterial({color:0x6b5a4c,roughness:.9}),
+  dark:new THREE.MeshBasicMaterial({color:0x1a1f2c}),
+  paper:new THREE.MeshBasicMaterial({color:0xd8d2bd}),
+  green:new THREE.MeshBasicMaterial({color:0x4dff9e}),
+  amber:new THREE.MeshBasicMaterial({color:0xffb020}),
+  red:new THREE.MeshBasicMaterial({color:0xff2418}),
+  cyan:new THREE.MeshBasicMaterial({color:0x5fe6ff})
+};
+
+const colliders=[];
+function box(w,h,d,mat,x,y,z,solid,pad){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+  m.position.set(x,y,z); scene.add(m);
+  if(solid) colliders.push({x,z,hw:w/2+(pad||0),hd:d/2+(pad||0)});
+  return m;
+}
+function slab(w,d,mat,x,z,y){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),mat);
+  m.rotation.x=-Math.PI/2; m.position.set(x,y||0,z); scene.add(m); return m;
+}
+
+// ───────── shell ─────────
+const ceilH=4.2;
+slab(28,38,MAT.floor,0,-1);
+slab(18,18,MAT.mechFloor,27,1);
+slab(4,6,MAT.mechFloor,16,1);
+slab(28,38,MAT.ceil,0,-1,ceilH).rotation.x=Math.PI/2;
+slab(18,18,MAT.ceil,27,1,ceilH).rotation.x=Math.PI/2;
+
+box(0.4,ceilH,38,MAT.wall,-14,ceilH/2,-1,true);
+box(0.4,ceilH,20,MAT.wall,14,ceilH/2,-9,true);
+box(0.4,ceilH,14,MAT.wall,14,ceilH/2,11,true);
+box(28,ceilH,0.4,MAT.wall,0,ceilH/2,-20,true);
+box(28,ceilH,0.4,MAT.wall,0,ceilH/2,18,true);
+box(4,ceilH,0.4,MAT.wall,16,ceilH/2,-2,true);
+box(4,ceilH,0.4,MAT.wall,16,ceilH/2,4,true);
+box(0.4,ceilH,18,MAT.wall,36,ceilH/2,1,true);
+box(18,ceilH,0.4,MAT.wall,27,ceilH/2,-8,true);
+box(18,ceilH,0.4,MAT.wall,27,ceilH/2,10,true);
+box(0.4,ceilH,6,MAT.wall,18,ceilH/2,-5,true);
+box(0.4,ceilH,6,MAT.wall,18,ceilH/2,7,true);
+
+const grid=new THREE.GridHelper(38,38,0x243044,0x1a2231);
+grid.position.set(0,0.02,-1); scene.add(grid);
+
+// ───────── racks (cover) ─────────
+const rackLeds=[];
+function buildRack(x,z){
+  const g=new THREE.Group(); g.position.set(x,0,z); scene.add(g);
+  const body=new THREE.Mesh(new THREE.BoxGeometry(0.9,2.1,1.1),MAT.rack); body.position.y=1.05; g.add(body);
+  const face=new THREE.Mesh(new THREE.BoxGeometry(0.82,1.95,0.06),MAT.rackFace); face.position.set(0,1.05,0.56); g.add(face);
+  for(let i=0;i<7;i++){
+    const on=Math.random()<0.8;
+    const led=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.03,0.03),
+      new THREE.MeshBasicMaterial({color:on?0x4dff9e:0x123322}));
+    led.position.set(0,0.35+i*0.25,0.6); g.add(led);
+    if(on) rackLeds.push({led,t:Math.random()*4});
+  }
+  colliders.push({x,z,hw:0.52,hd:0.62});
+}
+for(const rx of [-9.5,-5.5,5.5,9.5]) for(let i=0;i<9;i++) buildRack(rx,-15+i*3.4);
+
+// CRACs and ducts — set dressing only
+for(const z of [-11,-3,5]){
+  box(1.6,2.4,2.2,MAT.steel,-12.6,1.2,z,true,0.1);
+  box(0.06,1.6,1.8,MAT.dark,-11.78,1.3,z,false);
+  const d=new THREE.Mesh(new THREE.BoxGeometry(9,0.7,0.9),MAT.duct); d.position.set(-7.5,3.7,z); scene.add(d);
+}
+// mech room dressing
+box(4.4,2.6,2.4,MAT.steel,26,1.3,-5.5,true,0.15);
+box(3.2,2.8,2.0,MAT.steel,22,1.4,7.5,true,0.1);
+for(const px of [31,33]){
+  box(0.9,0.5,0.9,MAT.steel,px,0.25,-3,true,0.1);
+  const motor=new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.32,1.1,14),MAT.panel);
+  motor.rotation.z=Math.PI/2; motor.position.set(px,0.85,-3); scene.add(motor);
+}
+const pipe=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,16,12),MAT.pipeBlue);
+pipe.rotation.z=Math.PI/2; pipe.position.set(27,3.4,-6.8); scene.add(pipe);
+
+// NOC desk cluster at the north end
+box(3.0,0.07,1.2,MAT.steel,-4,0.78,-18,true,0.1);
+box(0.08,0.78,0.08,MAT.steel,-5.3,0.39,-17.6,false);
+box(0.08,0.78,0.08,MAT.steel,-2.7,0.39,-18.4,false);
+const monitor=new THREE.Mesh(new THREE.BoxGeometry(1.1,0.66,0.07),MAT.dark);
+monitor.position.set(-4,1.2,-18.3); scene.add(monitor);
+const monGlow=new THREE.Mesh(new THREE.BoxGeometry(0.98,0.54,0.02),new THREE.MeshBasicMaterial({color:0x0d2b38}));
+monGlow.position.set(-4,1.2,-18.24); scene.add(monGlow);
+
+// ───────── the puzzle ─────────
+// three fragments, assembled in the case notes
+const CODE_A='4', CODE_B='19', CODE_C='6';   // → 4196
+const CODE = CODE_A+CODE_B+CODE_C;
+
+const clues=[
+  {id:'note', got:false, title:'Sticky note, under the NOC keyboard',
+   text:'Whoever sits here got tired of calling security for the cabinet. "Cage door — starts with the row we decommissioned. Row '+CODE_A+'."',
+   frag:'First digit: '+CODE_A},
+  {id:'log', got:false, title:'Sign-in sheet, mechanical room',
+   text:'A clipboard by the air handler. Last four entries are the same contractor, same two digits scrawled in the access column every time: '+CODE_B+'.',
+   frag:'Middle digits: '+CODE_B},
+  {id:'badge', got:false, title:'Guard badge',
+   text:'Lifted off a guard. Laminated card, and somebody has written the last digit of the cabinet code on the back in marker so they don\'t have to remember it: '+CODE_C+'.',
+   frag:'Last digit: '+CODE_C}
+];
+function clue(id){ return clues.find(c=>c.id===id); }
+function clueCount(){ return clues.filter(c=>c.got).length; }
+
+// ───────── interactables ─────────
+const interactables=[];
+function addInteract(mesh,def){ mesh.userData.def=def; def.mesh=mesh; interactables.push(mesh); return def; }
+
+// sticky note on the desk
+const sticky=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.01,0.22),MAT.paper);
+sticky.position.set(-3.3,0.82,-17.7); sticky.rotation.y=0.4; scene.add(sticky);
+addInteract(sticky,{
+  name:'STICKY NOTE', hint:'Peeled off the underside of a keyboard.', verb:'READ',
+  act(){ takeClue('note'); sticky.visible=false; }
+});
+
+// clipboard in the mech room
+const clip=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.4,0.03),MAT.paper);
+clip.position.set(22,1.5,6.4); scene.add(clip);
+addInteract(clip,{
+  name:'SIGN-IN SHEET', hint:'Contractor log hanging off the air handler.', verb:'READ',
+  act(){ takeClue('log'); }
+});
+
+// secure cabinet
+const cab=new THREE.Group(); cab.position.set(34.4,0,7.5); scene.add(cab);
+const cabBody=new THREE.Mesh(new THREE.BoxGeometry(1.0,2.0,1.6),MAT.panel);
+cabBody.position.y=1.0; cab.add(cabBody);
+const cabDoor=new THREE.Mesh(new THREE.BoxGeometry(0.08,1.7,1.35),MAT.steel);
+cabDoor.position.set(-0.52,1.05,0); cab.add(cabDoor);
+const cabLamp=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.12,0.3),MAT.red);
+cabLamp.position.set(-0.57,1.85,0); cab.add(cabLamp);
+colliders.push({x:34.4,z:7.5,hw:0.7,hd:0.9});
+const D_CAB=addInteract(cabDoor,{
+  name:'SECURE CABINET', hint:'Keypad lock. Four digits.', verb:'ENTER CODE',
+  locked:()=> state.disc ? 'Already emptied.' : null,
+  act(){ openPad(); }
+});
+
+// the disc — hidden until the cabinet opens
+const disc=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,0.02,18),
+  new THREE.MeshStandardMaterial({color:0xc9d4e6,roughness:.2,metalness:.9}));
+disc.position.set(33.6,1.1,7.5); disc.rotation.z=Math.PI/2; disc.visible=false; scene.add(disc);
+const D_DISC=addInteract(disc,{
+  name:'THE DISC', hint:'Sitting in the open cabinet.', verb:'TAKE',
+  act(){
+    state.disc=true; disc.visible=false;
+    logLine('Disc in hand. Now find something to read it on.','good');
+    setObjective();
+  }
+});
+
+// NOC terminal
+const D_TERM=addInteract(monGlow,{
+  name:'NOC TERMINAL', hint:'Logged in and unattended.', verb:'HOLD E — COPY',
+  locked:()=> state.disc ? null : 'Nothing to put in it. The disc is behind a keypad in the mechanical room.',
+  hold:8.0,
+  act(){
+    state.hacked=true; monGlow.material.color.setHex(0x0f4a2a);
+    logLine('Files copied. Everything he has been moving is on you now.','good');
+    setObjective();
+  }
+});
+
+// breaker panel — kills the lights
+const brk=new THREE.Mesh(new THREE.BoxGeometry(0.14,1.0,0.7),MAT.panel);
+brk.position.set(35.8,1.7,-4); scene.add(brk);
+const brkLamp=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.1,0.1),MAT.green);
+brkLamp.position.set(35.7,2.1,-4); scene.add(brkLamp);
+addInteract(brk,{
+  name:'LIGHTING PANEL', hint:'Hall lighting contactor.', verb:'KILL THE LIGHTS',
+  locked:()=> state.dark ? 'Already dark. Somebody will put them back.' : null,
+  act(){
+    state.dark=true; state.darkT=26; brkLamp.material.color.setHex(0xff2418);
+    ambient.intensity=0.20; overhead.intensity=0.06;
+    logLine('Lights out. They can barely see — but somebody will come reset this.','good');
+  }
+});
+
+// exit
+const exitDoor=new THREE.Mesh(new THREE.BoxGeometry(0.14,3.0,1.8),MAT.dark);
+exitDoor.position.set(13.7,1.5,15); scene.add(exitDoor);
+addInteract(exitDoor,{
+  name:'SERVICE DOOR', hint:'The way you came in.', verb:'LEAVE',
+  locked:()=> state.hacked ? null : 'Not without what you came for.',
+  act(){ finish(true); }
+});
+
+// ───────── guards ─────────
+const guards=[];
+function buildGuard(path,speed,name){
+  const g=new THREE.Group(); scene.add(g);
+  const legs=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.9,0.3),MAT.guard); legs.position.y=0.45; g.add(legs);
+  const torso=new THREE.Mesh(new THREE.BoxGeometry(0.58,0.8,0.36),MAT.guardVest); torso.position.y=1.28; g.add(torso);
+  const head=new THREE.Mesh(new THREE.BoxGeometry(0.26,0.28,0.26),MAT.skin); head.position.y=1.82; g.add(head);
+  const cap=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.1,0.3),MAT.guard); cap.position.y=1.99; g.add(cap);
+  // shoulder light so you can read facing in the dark
+  const lamp=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,0.1),MAT.amber);
+  lamp.position.set(0.22,1.55,0.16); g.add(lamp);
+  const cone=new THREE.Mesh(new THREE.ConeGeometry(2.6,9,14,1,true),
+    new THREE.MeshBasicMaterial({color:0xffb020,transparent:true,opacity:0.045,
+      side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
+  cone.rotation.x=Math.PI/2; cone.position.set(0,1.5,4.5); g.add(cone);
+
+  const gd={g,path,speed,name,wp:1,sus:0,down:false,pause:0,lamp,cone,head,torso,legs,cap,
+            face:0,searched:false};
+  g.position.set(path[0][0],0,path[0][1]);
+  guards.push(gd);
+
+  const body=new THREE.Mesh(new THREE.BoxGeometry(0.7,1.9,0.5),new THREE.MeshBasicMaterial({visible:false}));
+  body.position.y=1.0; g.add(body);
+  addInteract(body,{
+    name:()=> gd.down ? 'GUARD — OUT COLD' : 'GUARD',
+    guard:gd,
+    hint:()=> gd.down ? 'Still breathing. Pockets are fair game.' : 'He has not seen you.',
+    verb:()=> gd.down ? 'SEARCH' : 'CHOKE OUT',
+    locked:()=>{
+      if(gd.down) return gd.searched ? 'Nothing left on him.' : null;
+      if(gd.sus>55) return 'He is already looking your way. Break off.';
+      const dx=P.x-gd.g.position.x, dz=P.z-gd.g.position.z;
+      const f=new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0),gd.g.rotation.y);
+      const to=new THREE.Vector3(dx,0,dz).normalize();
+      if(f.dot(to)>-0.25) return 'Only from behind. Get around him.';
+      if(Math.hypot(dx,dz)>1.8) return 'Too far. Closer, and quiet.';
+      return null;
+    },
+    act(){
+      if(gd.down){
+        gd.searched=true; takeClue('badge');
+      } else {
+        gd.down=true; state.downed++;
+        gd.g.rotation.x=Math.PI/2.1; gd.g.position.y=0.25;
+        gd.cone.visible=false; gd.lamp.material=MAT.dark;
+        logLine('Guard down. He never turned around.','good');
+        setObjective();
+      }
+    }
+  });
+  return gd;
+}
+buildGuard([[-7.5,-14],[-7.5,12],[0,12],[0,-14]],1.5,'A');
+buildGuard([[12.5,12],[12.5,-14],[7.5,-14],[7.5,12]],1.7,'B');
+buildGuard([[16,1],[22,1],[30,-4],[30,7],[22,1]],1.4,'C');
+
+// ───────── score: original, sequenced in Web Audio ─────────
+const MIX={master:0.5, music:0.34, musicMenu:0.20};
+let AC=null, master=null, muted=false, musicOn=true, MUSIC=null, NOISE=null;
+
+function initAudio(){
+  if(AC) return;
+  AC=new (window.AudioContext||window.webkitAudioContext)();
+  master=AC.createGain(); master.gain.value=MIX.master; master.connect(AC.destination);
+  const bus=AC.createGain(); bus.gain.value=0; bus.connect(master);
+  const delay=AC.createDelay(1.4), fb=AC.createGain(), send=AC.createGain();
+  fb.gain.value=0.36; send.gain.value=0.26;
+  delay.connect(fb); fb.connect(delay); delay.connect(send); send.connect(bus);
+  MUSIC={bus,delay,step:0,next:0,bpm:92,intensity:1};
+  MUSIC.delay.delayTime.value=60/MUSIC.bpm/2;
+  setInterval(schedule,25);
+}
+function noiseBuf(){
+  if(NOISE) return NOISE;
+  const n=AC.sampleRate*0.4; NOISE=AC.createBuffer(1,n,AC.sampleRate);
+  const d=NOISE.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
+  return NOISE;
+}
+function mn(m){ return 440*Math.pow(2,(m-69)/12); }
+
+// upright-ish walking bass
+function sBass(f,t,dur){
+  const o=AC.createOscillator(); o.type='triangle';
+  o.frequency.setValueAtTime(f*0.86,t);
+  o.frequency.exponentialRampToValueAtTime(f,t+0.045);
+  const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=780; lp.Q.value=1.2;
+  const g=AC.createGain();
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(0.42,t+0.012);
+  g.gain.exponentialRampToValueAtTime(0.02,t+dur);
+  o.connect(lp); lp.connect(g); g.connect(MUSIC.bus); o.start(t); o.stop(t+dur+0.03);
+}
+// brushed hat
+function sBrush(t,vol){
+  const s=AC.createBufferSource(); s.buffer=noiseBuf();
+  const bp=AC.createBiquadFilter(); bp.type='highpass'; bp.frequency.value=6200;
+  const g=AC.createGain();
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0006,t+0.075);
+  s.connect(bp); bp.connect(g); g.connect(MUSIC.bus); s.start(t); s.stop(t+0.09);
+}
+// rim click
+function sRim(t){
+  const o=AC.createOscillator(); o.type='square'; o.frequency.value=390;
+  const g=AC.createGain();
+  g.gain.setValueAtTime(0.14,t); g.gain.exponentialRampToValueAtTime(0.0006,t+0.05);
+  o.connect(g); g.connect(MUSIC.bus); o.start(t); o.stop(t+0.06);
+}
+// vibraphone-ish chord tone, goes through the delay
+function sVibe(f,t,dur){
+  const o=AC.createOscillator(); o.type='sine'; o.frequency.value=f;
+  const g=AC.createGain();
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(0.13,t+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0008,t+dur);
+  o.connect(g); g.connect(MUSIC.bus); g.connect(MUSIC.delay);
+  o.start(t); o.stop(t+dur+0.03);
+}
+// tremolo tension bed
+function sTension(f,t,dur){
+  const o=AC.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
+  const o2=AC.createOscillator(); o2.type='sawtooth'; o2.frequency.value=f; o2.detune.value=11;
+  const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1400; lp.Q.value=3;
+  const g=AC.createGain(); g.gain.value=0;
+  const lfo=AC.createOscillator(); lfo.type='sine'; lfo.frequency.value=7.5;
+  const lfoG=AC.createGain(); lfoG.gain.value=0.05;
+  lfo.connect(lfoG); lfoG.connect(g.gain);
+  g.gain.setValueAtTime(0.055,t);
+  g.gain.exponentialRampToValueAtTime(0.004,t+dur);
+  o.connect(lp); o2.connect(lp); lp.connect(g); g.connect(MUSIC.bus);
+  o.start(t); o2.start(t); lfo.start(t);
+  o.stop(t+dur+0.05); o2.stop(t+dur+0.05); lfo.stop(t+dur+0.05);
+}
+// heartbeat under pursuit
+function sPulse(t){
+  const o=AC.createOscillator(); o.type='sine';
+  o.frequency.setValueAtTime(96,t); o.frequency.exponentialRampToValueAtTime(38,t+0.11);
+  const g=AC.createGain();
+  g.gain.setValueAtTime(0.5,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.24);
+  o.connect(g); g.connect(MUSIC.bus); o.start(t); o.stop(t+0.26);
+}
+
+// i - bVI7 - iv - V7b9, four bars, eight 8ths each
+const BARS=[
+  {root:38, walk:[0,7,10,11], tri:[0,3,7,10]},
+  {root:34, walk:[0,4,7,9],   tri:[0,4,7,10]},
+  {root:31, walk:[0,7,10,12], tri:[0,3,7,10]},
+  {root:33, walk:[0,4,7,8],   tri:[0,4,7,13]}
+];
+
+function playStep(st,t,spb){
+  const bar=(st>>3)&3, B=BARS[bar], i=MUSIC.intensity;
+  if(i<=0) return;
+
+  if(st%2===0) sBass(mn(B.root-12+B.walk[(st%8)>>1]), t, spb*1.75);
+  if(i>=1) sBrush(t, (st%2)?0.028:0.017);
+  if(i>=2 && (st%8===2||st%8===6)) sRim(t);
+  if(i>=2 && st%8===0) B.tri.forEach((iv,k)=> sVibe(mn(B.root+12+iv), t+k*0.02, 1.3));
+  if(i>=3 && st%8===0) sTension(mn(B.root-24), t, spb*7);
+  if(i>=4 && st%2===0) sPulse(t);
+  if(i>=4 && st%8===4) sVibe(mn(B.root+25), t, 0.5);
+}
+function schedule(){
+  if(!MUSIC||!AC||AC.state!=='running') return;
+  const spb=60/MUSIC.bpm/2;
+  while(MUSIC.next < AC.currentTime+0.12){
+    if(MUSIC.next < AC.currentTime) MUSIC.next=AC.currentTime+0.02;
+    playStep(MUSIC.step, MUSIC.next, spb);
+    MUSIC.next+=spb;
+    MUSIC.step=(MUSIC.step+1)&31;
+  }
+}
+function updateMusic(dt){
+  if(!MUSIC) return;
+  const s=state.sus;
+  let want;
+  if(!musicOn) want=0;
+  else if(!state.playing) want=1;
+  else if(s>62) want=4;
+  else if(s>22) want=3;
+  else want=2;
+  MUSIC.intensity=want;
+  const vol = !musicOn?0 : (state.playing?MIX.music:MIX.musicMenu);
+  MUSIC.bus.gain.value += (vol-MUSIC.bus.gain.value)*Math.min(1,dt*2);
+  const bpm = 92 + (state.playing? Math.min(34, s*0.42) : 0);
+  MUSIC.bpm += (bpm-MUSIC.bpm)*Math.min(1,dt*1.1);
+  MUSIC.delay.delayTime.value=60/MUSIC.bpm/2;
+}
+
+// ───────── state ─────────
+const state={playing:false,time:0,sus:0,peakSus:0,downed:0,dark:false,darkT:0,
+  disc:false,hacked:false,hold:0,holdTarget:null,spotted:false,crouch:false};
+const P={x:11,z:15.5,vx:0,vz:0};
+
+// ───────── HUD ─────────
+const H={
+  obj:document.getElementById('objText'), objWhy:document.getElementById('objWhy'),
+  susVal:document.getElementById('susVal'), susFill:document.getElementById('susFill'),
+  susWhy:document.getElementById('susWhy'),
+  tagClues:document.getElementById('tagClues'), tagDisc:document.getElementById('tagDisc'),
+  tagLights:document.getElementById('tagLights'),
+  prompt:document.getElementById('prompt'), reticle:document.getElementById('reticle'),
+  log:document.getElementById('log'), stance:document.getElementById('stance'),
+  progWrap:document.getElementById('progWrap'), progFill:document.getElementById('progFill'),
+  progLabel:document.getElementById('progLabel'), vig:document.getElementById('vig')
+};
+function logLine(text,cls){
+  const d=document.createElement('div'); d.className='line'+(cls?' '+cls:''); d.textContent=text;
+  H.log.appendChild(d);
+  while(H.log.children.length>4) H.log.removeChild(H.log.firstChild);
+  setTimeout(()=>{ if(d.parentNode) d.parentNode.removeChild(d); },7000);
+}
+function setObjective(){
+  let t,w;
+  if(!state.disc && clueCount()<3){
+    t='Work out the cabinet code';
+    w='Three fragments are on this floor. One at the NOC desk, one in the mechanical room, and one in a guard\'s pocket — which means putting a guard down. TAB shows what you have.';
+  } else if(!state.disc){
+    t='Open the cabinet, take the disc';
+    w='You have all three digits. The cabinet is the grey box in the far corner of the mechanical room.';
+  } else if(!state.hacked){
+    t='Get the disc into the NOC terminal';
+    w='North end of the data hall. Eight seconds of holding still, and the floor has to stay quiet while you do it.';
+  } else {
+    t='Walk out';
+    w='Service door on the east wall where you came in.';
+  }
+  H.obj.textContent=t; H.objWhy.textContent=w;
+}
+function paintHUD(){
+  const s=state.sus;
+  H.susFill.style.transform='scaleX('+Math.min(1,s/100)+')';
+  H.susVal.textContent = s>=100?'MADE':s>62?'SPOTTED':s>18?'SUSPICIOUS':'UNSEEN';
+  if(s>=100){ H.susWhy.textContent='They have you.'; H.susWhy.className='why bad'; }
+  else if(s>18){ H.susWhy.textContent='Break line of sight and it bleeds back down.'; H.susWhy.className='why warn'; }
+  else if(state.crouch){ H.susWhy.textContent='Crouched. They need to be close to make you.'; H.susWhy.className='why ok'; }
+  else { H.susWhy.textContent='Nobody is looking at you.'; H.susWhy.className='why'; }
+
+  H.tagClues.textContent='CLUES '+clueCount()+'/3';
+  H.tagClues.className='tag'+(clueCount()===3?' on':'');
+  H.tagDisc.textContent=state.hacked?'FILES COPIED':state.disc?'DISC':'NO DISC';
+  H.tagDisc.className='tag'+((state.disc||state.hacked)?' on':'');
+  H.tagLights.textContent=state.dark?('DARK '+Math.ceil(state.darkT)+'s'):'LIGHTS ON';
+  H.tagLights.className='tag'+(state.dark?' dark':'');
+  H.stance.innerHTML=state.crouch?'<b>CROUCHED</b>':'STANDING';
+}
+
+// ───────── overlays ─────────
+const jEl=document.getElementById('journal'), jList=document.getElementById('jList'), jSolve=document.getElementById('jSolve');
+function paintJournal(){
+  jList.innerHTML='';
+  clues.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='jItem'+(c.got?'':' pending');
+    d.innerHTML='<b>'+(c.got?c.title:'— not found yet —')+'</b><span>'+(c.got?c.frag:'Somewhere on this floor.')+'</span>';
+    jList.appendChild(d);
+  });
+  jSolve.innerHTML = clueCount()===3
+    ? 'Three fragments, in order. The cabinet code reads:<b>'+CODE+'</b>'
+    : 'You have '+clueCount()+' of 3. The code will not assemble until all three are in hand.';
+}
+function toggleJournal(){
+  if(jEl.classList.contains('on')){ jEl.classList.remove('on'); if(state.playing) document.body.requestPointerLock(); }
+  else { paintJournal(); jEl.classList.add('on'); document.exitPointerLock(); }
+}
+
+const docEl=document.getElementById('doc'), docHead=document.getElementById('docHead'), docBody=document.getElementById('docBody');
+function takeClue(id){
+  const c=clue(id);
+  if(c.got) return;
+  c.got=true;
+  docHead.textContent=c.title.toUpperCase();
+  docBody.textContent=c.text;
+  docEl.classList.add('on'); document.exitPointerLock();
+  logLine('Clue '+clueCount()+' of 3 — '+c.frag,'good');
+  setObjective();
+}
+docEl.onclick=()=>{ docEl.classList.remove('on'); if(state.playing) document.body.requestPointerLock(); };
+
+const padEl=document.getElementById('pad'), padVal=document.getElementById('padVal'), padHint=document.getElementById('padHint');
+let padBuf='';
+function openPad(){
+  padBuf=''; padVal.textContent=''; padVal.className='';
+  padHint.textContent = clueCount()===3 ? 'Four digits. Check your notes.' : 'Four digits. You are guessing — you have '+clueCount()+' of 3.';
+  padEl.classList.add('on'); document.exitPointerLock();
+}
+padEl.querySelectorAll('button').forEach(b=>{
+  b.onclick=()=>{
+    const k=b.dataset.k;
+    if(k==='x'){ padEl.classList.remove('on'); if(state.playing) document.body.requestPointerLock(); return; }
+    if(k==='c'){ padBuf=''; padVal.textContent=''; padVal.className=''; return; }
+    if(padBuf.length>=4) return;
+    padBuf+=k; padVal.textContent='•'.repeat(padBuf.length);
+    if(padBuf.length===4){
+      if(padBuf===CODE){
+        padVal.textContent='OK'; cabLamp.material.color.setHex(0x4dff9e);
+        cabDoor.rotation.y=-1.1; cabDoor.position.set(-0.9,1.05,0.6);
+        disc.visible=true;
+        logLine('Cabinet open.','good');
+        setTimeout(()=>{ padEl.classList.remove('on'); if(state.playing) document.body.requestPointerLock(); setObjective(); },600);
+      } else {
+        padVal.textContent='NO'; padVal.className='bad';
+        padHint.textContent='Rejected. The keypad chirped — that carries.';
+        state.sus=Math.min(99,state.sus+14);
+        setTimeout(()=>{ padBuf=''; padVal.textContent=''; padVal.className=''; },700);
+      }
+    }
+  };
+});
+
+// ───────── input ─────────
+const keys={};
+let yaw=Math.PI, pitch=0, locked=false, SENS=14;
+const sensEl=document.getElementById('sens'), sensVal=document.getElementById('sensVal');
+sensEl.oninput=()=>{ SENS=+sensEl.value; sensVal.textContent=SENS; };
+addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='tab'||k==='q'){ e.preventDefault(); if(state.playing) toggleJournal(); return; }
+  if(k===' ') e.preventDefault();
+  const fresh=!keys[k];
+  keys[k]=true;
+  if(!fresh) return;
+  if(k==='f') torch.visible=!torch.visible;
+  if(k==='c'&&state.playing) state.crouch=!state.crouch;
+  if(k==='m'){ muted=!muted; if(master) master.gain.value=muted?0:MIX.master; logLine(muted?'Audio muted.':'Audio live.'); }
+  if(k==='n'){ musicOn=!musicOn; logLine(musicOn?'Score on.':'Score off.'); }
+});
+addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; });
+addEventListener('mousemove',e=>{
+  if(!locked) return;
+  const sens=SENS*0.00016;
+  yaw-=e.movementX*sens;
+  pitch=Math.max(-1.25,Math.min(1.25,pitch-e.movementY*sens));
+});
+document.addEventListener('pointerlockchange',()=>{ locked=document.pointerLockElement===document.body; });
+renderer.domElement.addEventListener('click',()=>{
+  if(state.playing && !padEl.classList.contains('on') && !docEl.classList.contains('on') && !jEl.classList.contains('on'))
+    document.body.requestPointerLock();
+});
+
+// ───────── movement + LOS ─────────
+function blocked(nx,nz){
+  for(const c of colliders)
+    if(Math.abs(nx-c.x)<c.hw+0.38 && Math.abs(nz-c.z)<c.hd+0.38) return true;
+  return false;
+}
+function losClear(ax,az,bx,bz){
+  const dx=bx-ax, dz=bz-az, d=Math.hypot(dx,dz), steps=Math.ceil(d/0.7);
+  for(let i=1;i<steps;i++){
+    const t=i/steps;
+    if(blocked(ax+dx*t, az+dz*t)) return false;
+  }
+  return true;
+}
+function move(dt){
+  const running = keys['shift'] && !state.crouch;
+  const spd = state.crouch?1.35:(running?4.4:2.7);
+  let fx=0,fz=0;
+  if(keys['w']) fz-=1; if(keys['s']) fz+=1;
+  if(keys['a']) fx-=1; if(keys['d']) fx+=1;
+  const len=Math.hypot(fx,fz)||1; fx/=len; fz/=len;
+  const sin=Math.sin(yaw), cos=Math.cos(yaw);
+  const wx=fx*cos-fz*sin, wz=fx*sin+fz*cos;
+  P.vx+=(wx*spd-P.vx)*Math.min(1,dt*12);
+  P.vz+=(wz*spd-P.vz)*Math.min(1,dt*12);
+  const nx=P.x+P.vx*dt, nz=P.z+P.vz*dt;
+  if(!blocked(nx,P.z)) P.x=nx; else P.vx=0;
+  if(!blocked(P.x,nz)) P.z=nz; else P.vz=0;
+  const moving=Math.hypot(P.vx,P.vz);
+  const bob=Math.sin(performance.now()*0.012)*Math.min(0.05,moving*0.014);
+  camera.position.set(P.x,(state.crouch?1.05:1.65)+bob,P.z);
+  camera.rotation.set(pitch,yaw,0);
+  return {running,moving};
+}
+
+// ───────── guards tick ─────────
+function tickGuards(dt,running,moving){
+  let anySees=false, loudest=0;
+  guards.forEach(gd=>{
+    if(gd.down) return;
+    // patrol
+    if(gd.pause>0){ gd.pause-=dt; }
+    else {
+      const tgt=gd.path[gd.wp];
+      const dx=tgt[0]-gd.g.position.x, dz=tgt[1]-gd.g.position.z;
+      const d=Math.hypot(dx,dz);
+      if(d<0.35){ gd.wp=(gd.wp+1)%gd.path.length; gd.pause=0.6+Math.random()*1.4; }
+      else {
+        const sp=gd.speed*(gd.sus>35?1.5:1);
+        gd.g.position.x+=dx/d*sp*dt; gd.g.position.z+=dz/d*sp*dt;
+        gd.face=Math.atan2(dx,dz);
+      }
+    }
+    let want=gd.face;
+    // look toward the player once suspicious
+    if(gd.sus>30){
+      want=Math.atan2(P.x-gd.g.position.x, P.z-gd.g.position.z);
+    }
+    let diff=((want-gd.g.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI;
+    gd.g.rotation.y+=diff*Math.min(1,dt*5);
+
+    // vision
+    const dx=P.x-gd.g.position.x, dz=P.z-gd.g.position.z, dist=Math.hypot(dx,dz);
+    const range=(state.dark?4.6:9.5)*(state.crouch?0.62:1)*(torch.visible?1.35:1);
+    let sees=false;
+    if(dist<range){
+      const f=new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0),gd.g.rotation.y);
+      const to=new THREE.Vector3(dx,0,dz).normalize();
+      if(f.dot(to)>0.78 && losClear(gd.g.position.x,gd.g.position.z,P.x,P.z)) sees=true;
+    }
+    // noise: running is heard through racks
+    const heard = running && dist<8.5;
+    if(sees||heard){
+      anySees=anySees||sees;
+      const rate = (sees? (state.crouch?16:30)*(1-dist/range*0.5) : 10);
+      gd.sus=Math.min(100,gd.sus+rate*dt);
+    } else {
+      gd.sus=Math.max(0,gd.sus-11*dt);
+    }
+    // a downed colleague in view is its own problem
+    guards.forEach(o=>{
+      if(!o.down || o===gd) return;
+      const bx=o.g.position.x-gd.g.position.x, bz=o.g.position.z-gd.g.position.z;
+      if(Math.hypot(bx,bz)<6 && losClear(gd.g.position.x,gd.g.position.z,o.g.position.x,o.g.position.z))
+        gd.sus=Math.min(100,gd.sus+16*dt);
+    });
+
+    loudest=Math.max(loudest,gd.sus);
+    const c = gd.sus>62?0xff2418 : gd.sus>25?0xffb020 : 0x4dff9e;
+    gd.lamp.material=new THREE.MeshBasicMaterial({color:c});
+    gd.cone.material.color.setHex(c);
+    gd.cone.material.opacity = gd.sus>25?0.10:0.045;
+  });
+  state.spotted=anySees;
+  state.sus=loudest;
+  state.peakSus=Math.max(state.peakSus,state.sus);
+  H.vig.style.opacity = state.sus>50 ? Math.min(0.8,(state.sus-50)/50) : 0;
+  if(state.sus>=100) finish(false,'made');
+}
+
+// ───────── interaction ─────────
+const ray=new THREE.Raycaster(), centre=new THREE.Vector2(0,0);
+let focus=null;
+function val(v){ return typeof v==='function'?v():v; }
+function scan(){
+  ray.setFromCamera(centre,camera);
+  const hits=ray.intersectObjects(interactables,false);
+  const hit=(hits.length && hits[0].distance<3.2)?hits[0].object:null;
+  focus=hit?hit.userData.def:null;
+  H.reticle.className='';
+  if(!focus){
+    H.prompt.classList.remove('on');
+    if(state.holdTarget){ state.holdTarget=null; state.hold=0; H.progWrap.classList.remove('on'); }
+    return;
+  }
+  const why=focus.locked?focus.locked():null;
+  const isKill = focus.guard && !focus.guard.down && !why;
+  H.reticle.className = isKill?'kill':'hot';
+  H.prompt.className='on'+(why?' locked':'')+(isKill?' kill':'');
+  H.prompt.innerHTML='<b>'+val(focus.name)+'</b><i>'+(why||val(focus.hint))+'</i>'
+    +(why?'':'<em>'+val(focus.verb)+'</em>');
+}
+function tryUse(dt){
+  if(!focus) return;
+  if(focus.locked && focus.locked()) return;
+  if(focus.hold){
+    if(state.holdTarget!==focus){ state.holdTarget=focus; state.hold=0; }
+    state.hold+=dt;
+    H.progWrap.classList.add('on');
+    H.progLabel.textContent='COPYING — '+Math.round(state.hold/focus.hold*100)+'%';
+    H.progFill.style.transform='scaleX('+Math.min(1,state.hold/focus.hold)+')';
+    if(state.hold>=focus.hold){
+      H.progWrap.classList.remove('on'); state.holdTarget=null; state.hold=0; focus.act();
+    }
+  } else if(!focus.oneshot){
+    focus.oneshot=true; focus.act();
+    setTimeout(()=>{ focus.oneshot=false; },400);
+  }
+}
+
+// ───────── loop ─────────
+let last=performance.now();
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt=Math.min((now-last)/1000,0.05); last=now;
+
+  rackLeds.forEach(r=>{ r.t+=dt;
+    if(r.t>0.6+Math.random()){ r.t=0; r.led.material.color.setHex(Math.random()<0.85?0x4dff9e:0x123322); } });
+
+  if(state.playing){
+    state.time+=dt;
+    const {running,moving}=move(dt);
+    scan();
+    if(keys['e']) tryUse(dt);
+    else if(state.holdTarget){ state.holdTarget=null; state.hold=0; H.progWrap.classList.remove('on'); }
+
+    if(state.dark){
+      state.darkT-=dt;
+      if(state.darkT<=0){
+        state.dark=false; brkLamp.material.color.setHex(0x4dff9e);
+        ambient.intensity=0.75; overhead.intensity=0.34;
+        logLine('Lights back on. Somebody reset the panel.','warn');
+      }
+    }
+    tickGuards(dt,running,moving);
+    paintHUD();
+  }
+  updateMusic(dt);
+  renderer.render(scene,camera);
+}
+
+// ───────── run control ─────────
+const menu=document.getElementById('menu'), endS=document.getElementById('end');
+function start(){
+  initAudio(); if(AC.state==='suspended') AC.resume();
+  Object.assign(state,{playing:true,time:0,sus:0,peakSus:0,downed:0,dark:false,darkT:0,
+    disc:false,hacked:false,hold:0,holdTarget:null,spotted:false,crouch:false});
+  clues.forEach(c=>c.got=false);
+  sticky.visible=true; disc.visible=false;
+  cabDoor.rotation.y=0; cabDoor.position.set(-0.52,1.05,0);
+  cabLamp.material.color.setHex(0xff2418);
+  monGlow.material.color.setHex(0x0d2b38);
+  brkLamp.material.color.setHex(0x4dff9e);
+  ambient.intensity=0.75; overhead.intensity=0.34;
+  guards.forEach(gd=>{
+    gd.down=false; gd.searched=false; gd.sus=0; gd.wp=1; gd.pause=0;
+    gd.g.rotation.set(0,0,0); gd.g.position.set(gd.path[0][0],0,gd.path[0][1]);
+    gd.cone.visible=true; gd.lamp.material=new THREE.MeshBasicMaterial({color:0x4dff9e});
+  });
+  P.x=11; P.z=15.5; P.vx=0; P.vz=0; yaw=Math.PI; pitch=0;
+  torch.visible=false;
+  menu.classList.add('hidden'); endS.classList.add('hidden');
+  setObjective(); paintHUD();
+  logLine('Inside. Three on the floor. Nothing on you but your hands.','warn');
+  document.body.requestPointerLock();
+}
+function finish(won,why){
+  if(!state.playing) return;
+  state.playing=false; document.exitPointerLock();
+  H.prompt.classList.remove('on'); H.progWrap.classList.remove('on'); H.vig.style.opacity=0;
+  const m=Math.floor(state.time/60), s=Math.floor(state.time%60);
+  document.getElementById('eTime').textContent=m+':'+String(s).padStart(2,'0');
+  document.getElementById('eDown').textContent=state.downed;
+  document.getElementById('ePeak').textContent=Math.round(state.peakSus)+'%';
+  document.getElementById('endTitle').textContent = won?(state.downed===0?'GHOST':'OUT CLEAN'):'MADE';
+  document.getElementById('endWhy').textContent = won
+    ? (state.downed===0
+        ? 'Nobody was touched and nobody knows you were here. That is the best version of this.'
+        : state.downed+' guard'+(state.downed===1?'':'s')+' will wake up on the floor with a story. You still got out with the files.')
+    : 'A guard filled his meter and called it. Crouching cuts how fast they read you, racks break line of sight, and the lighting panel in the mechanical room buys you about twenty-five seconds of near-blindness.';
+  endS.classList.remove('hidden');
+}
+document.getElementById('startBtn').onclick=start;
+document.getElementById('againBtn').onclick=start;
+document.getElementById('menuBackBtn').onclick=()=>location.href='index.html';
+document.getElementById('endBackBtn').onclick=()=>location.href='index.html';
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
