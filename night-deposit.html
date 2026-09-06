@@ -297,14 +297,14 @@ document.body.appendChild(renderer.domElement);
 
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x05070c);
-scene.fog=new THREE.Fog(0x05070c,9,52);
+scene.fog=new THREE.Fog(0x05070c,5,30);
 
 const camera=new THREE.PerspectiveCamera(74,innerWidth/innerHeight,0.05,300);
 camera.rotation.order='YXZ';
 scene.add(camera);
 
-const ambient=new THREE.AmbientLight(0x2b3350,0.86); scene.add(ambient);
-const moon=new THREE.DirectionalLight(0x93a6dd,0.4); moon.position.set(-30,50,20); scene.add(moon);
+const ambient=new THREE.AmbientLight(0x232b45,0.60); scene.add(ambient);
+const moon=new THREE.DirectionalLight(0x93a6dd,0.30); moon.position.set(-30,50,20); scene.add(moon);
 const torch=new THREE.SpotLight(0xdfeaff,1.4,24,0.5,0.45,1.4);
 torch.position.set(0,0,0.2); camera.add(torch); camera.add(torch.target);
 torch.target.position.set(0,0,-1); torch.visible=false;
@@ -416,24 +416,17 @@ LANDINGS.forEach(l=>{
 // Amber runs down a flight, cyan runs up it — readable from the landing.
 RAMPS.forEach(r=>{
   const n=10, dz=(r.zBot-r.zTop)/n;
-  const down=new THREE.MeshBasicMaterial({color:0xffb020});
-  const up=new THREE.MeshBasicMaterial({color:0x5fe6ff});
+  // small, dim, and low to the tread — step markers, not lighting
+  const down=new THREE.MeshBasicMaterial({color:0x8a5c10});
+  const up=new THREE.MeshBasicMaterial({color:0x1d5568});
   for(let i=0;i<=n;i++){
     const z=r.zTop+i*dz;
     const t=(z-r.zTop)/(r.zBot-r.zTop);
     const y=r.yTop+(r.yBot-r.yTop)*t;
-    // amber toward the bottom of the flight, cyan toward the top
-    const m=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.06,0.5), t>0.5?down:up);
-    m.position.set(r.x0+0.18,y+0.06,z); scene.add(m);
-    const m2=m.clone(); m2.position.x=r.x1-0.18; scene.add(m2);
+    const m=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.03,0.26), t>0.5?down:up);
+    m.position.set(r.x0+0.14,y+0.03,z); scene.add(m);
+    const m2=m.clone(); m2.position.x=r.x1-0.14; scene.add(m2);
   }
-});
-// landing strip lights so the shaft is readable at all
-LANDINGS.forEach(l=>{
-  const cz=(l.z0+l.z1)/2;
-  const bar=new THREE.Mesh(new THREE.BoxGeometry(TOWER.x1-TOWER.x0-0.6,0.08,0.18),
-    new THREE.MeshBasicMaterial({color:0x9fb6d8}));
-  bar.position.set((TOWER.x0+TOWER.x1)/2, l.y+3.05, cz); scene.add(bar);
 });
 
 // exterior shell
