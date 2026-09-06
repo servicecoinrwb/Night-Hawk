@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COLD AISLE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,500;0,600;0,700;1,700&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#04060a;--cyan:#5fe6ff;--green:#4dff9e;--amber:#ffb020;--red:#ff2418;--steel:#8f9ab8}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:var(--ink)}
+  body{font-family:'Chakra Petch',system-ui,sans-serif;color:#e8ecf7;-webkit-user-select:none;user-select:none}
+  canvas{display:block}
+
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+  .pane{position:absolute}
+
+  #objPane{top:18px;left:20px;max-width:340px}
+  #objLabel{font-size:10.5px;font-weight:700;letter-spacing:2.4px;color:var(--steel)}
+  #objText{font-size:18px;font-weight:700;color:#fff;line-height:1.25;margin-top:3px}
+  #objWhy{font-size:12.5px;font-weight:500;color:var(--cyan);margin-top:6px;line-height:1.4}
+
+  #envPane{top:18px;right:20px;text-align:right;width:230px}
+  .gauge{margin-bottom:12px}
+  .gTop{display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;letter-spacing:.6px;margin-bottom:4px}
+  .gTop span{color:var(--steel);font-weight:600}
+  .bar{height:7px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);position:relative;overflow:hidden}
+  .fill{position:absolute;inset:0;transform-origin:left center;transform:scaleX(0);transition:transform .1s linear}
+  #tempFill{background:linear-gradient(90deg,#5fe6ff,#ffb020 62%,#ff2418)}
+  #alertFill{background:linear-gradient(90deg,#4dff9e,#ffb020 55%,#ff2418)}
+  .why{font-size:11.5px;font-weight:500;color:var(--steel);margin-top:4px;line-height:1.35;text-align:right}
+  .why.warn{color:var(--amber)}
+  .why.bad{color:var(--red)}
+  .why.ok{color:var(--green)}
+
+  #reticle{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:7px;height:7px;border:1px solid rgba(255,255,255,.55);border-radius:50%}
+  #reticle.hot{border-color:var(--cyan);box-shadow:0 0 10px rgba(95,230,255,.8);transform:translate(-50%,-50%) scale(1.5)}
+
+  #prompt{position:absolute;top:calc(50% + 34px);left:50%;transform:translateX(-50%);
+    text-align:center;font-size:14px;font-weight:600;display:none;max-width:420px}
+  #prompt.on{display:block}
+  #prompt b{display:block;color:#fff;font-size:15.5px;font-weight:700}
+  #prompt i{display:block;font-style:normal;color:var(--steel);font-size:12.5px;font-weight:500;margin-top:3px}
+  #prompt em{display:inline-block;font-style:normal;margin-top:6px;font-size:12px;font-weight:700;
+    letter-spacing:1px;color:var(--cyan);border:1px solid rgba(95,230,255,.35);padding:3px 10px}
+  #prompt.locked em{color:var(--amber);border-color:rgba(255,176,32,.35)}
+
+  #log{position:absolute;left:20px;bottom:20px;width:min(430px,60vw)}
+  .line{font-size:13px;font-weight:600;color:var(--cyan);background:rgba(4,14,22,.72);
+    border-left:2px solid rgba(95,230,255,.5);padding:6px 12px;margin-top:5px}
+  .line.warn{color:var(--amber);border-left-color:rgba(255,176,32,.55)}
+  .line.bad{color:var(--red);border-left-color:rgba(255,36,24,.55)}
+
+  #progWrap{position:absolute;left:50%;bottom:23%;transform:translateX(-50%);width:min(380px,70vw);display:none}
+  #progWrap.on{display:block}
+  #progLabel{font-size:12px;font-weight:700;letter-spacing:1.4px;color:var(--cyan);text-align:center;margin-bottom:6px}
+  #progBar{height:9px;background:rgba(255,255,255,.08);border:1px solid rgba(95,230,255,.3);position:relative;overflow:hidden}
+  #progFill{position:absolute;inset:0;background:var(--cyan);transform-origin:left center;transform:scaleX(0)}
+
+  #flash{position:fixed;inset:0;background:var(--red);opacity:0;pointer-events:none;z-index:12;transition:opacity .12s}
+
+  .screen{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;padding:26px;text-align:center;
+    background:radial-gradient(ellipse at 50% 55%,rgba(6,26,38,.72),rgba(2,4,8,.96) 70%)}
+  .screen.hidden{display:none}
+  .title{font-size:clamp(40px,9vw,92px);font-weight:700;font-style:italic;letter-spacing:-2.5px;line-height:.88;color:#fff}
+  .sub{font-size:11px;font-weight:700;letter-spacing:4px;color:var(--cyan);margin-bottom:10px}
+  .tag{font-size:15px;font-weight:600;color:var(--steel);max-width:58ch;margin-top:12px;line-height:1.55}
+  .tag em{color:#e8ecf7;font-style:normal}
+  .keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px 22px;
+    margin:24px 0 4px;width:min(660px,90vw);text-align:left}
+  .key{font-size:13.5px;font-weight:500;color:var(--steel);display:flex;gap:9px;align-items:baseline}
+  .key b{font-weight:700;color:#fff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
+    padding:1px 7px;font-size:12px;white-space:nowrap}
+  .btnRow{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;align-items:center}
+  button.go{pointer-events:auto;margin-top:24px;font-family:inherit;font-size:18px;font-weight:700;font-style:italic;
+    color:#02141a;background:var(--cyan);border:0;padding:14px 40px;cursor:pointer;
+    clip-path:polygon(0 0,100% 0,calc(100% - 14px) 100%,0 100%);box-shadow:0 0 32px rgba(95,230,255,.4)}
+  button.go:hover{box-shadow:0 0 46px rgba(95,230,255,.7)}
+  button.ghost{pointer-events:auto;margin-top:24px;font-family:inherit;font-size:15px;font-weight:600;color:#cfd6e8;
+    background:transparent;border:1px solid rgba(255,255,255,.22);padding:13px 24px;cursor:pointer}
+  button.ghost:hover{border-color:rgba(255,255,255,.5);color:#fff}
+  .statRow{display:flex;gap:34px;margin:20px 0 2px;flex-wrap:wrap;justify-content:center}
+  .stat b{display:block;font-size:34px;font-weight:700;font-style:italic;color:#fff;line-height:1}
+  .stat span{font-size:12px;font-weight:600;color:var(--steel)}
+  #endWhy{font-size:15px;font-weight:600;color:var(--amber);margin-top:14px;max-width:52ch;line-height:1.5}
+
+  /* keypad */
+  #pad{position:fixed;inset:0;z-index:22;display:none;align-items:center;justify-content:center;
+    background:rgba(2,6,10,.86)}
+  #pad.on{display:flex}
+  .padBox{width:min(320px,86vw);border:1px solid rgba(95,230,255,.3);background:rgba(4,14,22,.96);padding:22px}
+  .padTitle{font-size:12px;font-weight:700;letter-spacing:2px;color:var(--cyan);text-align:center}
+  .padHint{font-size:12px;font-weight:500;color:var(--steel);text-align:center;margin-top:6px;line-height:1.4}
+  #padVal{font-size:36px;font-weight:700;font-style:italic;text-align:center;letter-spacing:10px;
+    color:#fff;margin:14px 0;min-height:42px}
+  #padVal.bad{color:var(--red)}
+  .padGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .padGrid button{font-family:inherit;font-size:20px;font-weight:700;color:#e8ecf7;background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.14);padding:12px 0;cursor:pointer}
+  .padGrid button:hover{background:rgba(95,230,255,.14);border-color:rgba(95,230,255,.5)}
+
+  /* readable note */
+  #note{position:fixed;inset:0;z-index:22;display:none;align-items:center;justify-content:center;
+    background:rgba(2,6,10,.86)}
+  #note.on{display:flex}
+  .noteBox{width:min(420px,88vw);background:#f4f1e4;color:#20242e;padding:26px 28px;
+    box-shadow:0 20px 60px rgba(0,0,0,.6);transform:rotate(-1.2deg)}
+  .noteBox h4{font-size:12px;letter-spacing:2px;color:#7a7566;font-weight:700}
+  .noteBox p{font-size:15.5px;font-weight:600;margin-top:10px;line-height:1.5}
+  .noteBox .big{font-size:30px;font-weight:700;letter-spacing:8px;margin-top:12px;font-style:italic}
+  .noteBox small{display:block;margin-top:14px;font-size:11.5px;color:#7a7566;font-weight:600}
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="pane" id="objPane">
+    <div id="objLabel">OBJECTIVE</div>
+    <div id="objText">—</div>
+    <div id="objWhy"></div>
+  </div>
+
+  <div class="pane" id="envPane">
+    <div class="gauge">
+      <div class="gTop"><span>HALL TEMP</span><b id="tempVal">78°F</b></div>
+      <div class="bar"><div class="fill" id="tempFill"></div></div>
+      <div class="why" id="tempWhy">Cooling is down. It climbs until you fix it.</div>
+    </div>
+    <div class="gauge">
+      <div class="gTop"><span>SECURITY</span><b id="alertVal">CLEAR</b></div>
+      <div class="bar"><div class="fill" id="alertFill"></div></div>
+      <div class="why" id="alertWhy">Cameras haven't seen you.</div>
+    </div>
+  </div>
+
+  <div id="reticle"></div>
+  <div id="prompt"></div>
+  <div id="progWrap"><div id="progLabel">WORKING</div><div id="progBar"><div id="progFill"></div></div></div>
+  <div id="log"></div>
+</div>
+
+<div id="flash"></div>
+
+<div id="pad"><div class="padBox">
+  <div class="padTitle">BAS CONTROLLER — LOCAL ACCESS</div>
+  <div class="padHint" id="padHint">Four-digit service PIN.</div>
+  <div id="padVal"></div>
+  <div class="padGrid">
+    <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+    <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+    <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+    <button data-k="c">C</button><button data-k="0">0</button><button data-k="x">✕</button>
+  </div>
+</div></div>
+
+<div id="note"><div class="noteBox">
+  <h4>SITE BINDER — COOLING</h4>
+  <p>Chiller keeps faulting on low flow after a power blip. Reset at the panel, open CHW isolation, then restart P-1. In that order or it faults again.</p>
+  <p>BAS service PIN:</p>
+  <div class="big" id="notePin">7117</div>
+  <small>Click anywhere to put it back.</small>
+</div></div>
+
+<div class="screen" id="menu">
+  <div class="sub">NIGHT HAWK — SIDE JOB</div>
+  <h1 class="title">COLD AISLE</h1>
+  <p class="tag">You're inside a colo at 3am. The data on that core cabinet is the job — but the cabinet is thermally interlocked, and somebody let the chiller fault out hours ago. <em>The hall is heating up.</em> Fix the cooling you came to exploit, then take what you came for and walk out before security notices the doors.</p>
+
+  <div class="keys">
+    <div class="key"><b>W A S D</b><span>Move. Mouse looks.</span></div>
+    <div class="key"><b>Shift</b><span>Move quiet. Cameras see you slower.</span></div>
+    <div class="key"><b>E</b><span>Use whatever you're looking at.</span></div>
+    <div class="key"><b>F</b><span>Flashlight.</span></div>
+    <div class="key"><b>Esc</b><span>Release the mouse.</span></div>
+  </div>
+
+  <div class="btnRow">
+    <button class="go" id="startBtn">Go in</button>
+    <button class="ghost" id="driveBtn">Back to menu</button>
+  </div>
+</div>
+
+<div class="screen hidden" id="end">
+  <h1 class="title" id="endTitle">OUT CLEAN</h1>
+  <div class="statRow">
+    <div class="stat"><b id="eTime">0:00</b><span>On site</span></div>
+    <div class="stat"><b id="ePeak">0°F</b><span>Peak hall temp</span></div>
+    <div class="stat"><b id="eAlert">0%</b><span>Peak security</span></div>
+  </div>
+  <p id="endWhy"></p>
+  <div class="btnRow">
+    <button class="go" id="againBtn">Run it again</button>
+    <button class="ghost" id="endBackBtn">Back to menu</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+
+const PIN = '7117';
+document.getElementById('notePin').textContent = PIN;
+
+// ───────── renderer ─────────
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x04060a);
+scene.fog=new THREE.Fog(0x04060a,6,44);
+
+const camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,0.05,200);
+camera.rotation.order='YXZ';
+camera.position.set(0,1.65,16);
+
+scene.add(new THREE.AmbientLight(0x2a3348,0.7));
+const torch=new THREE.SpotLight(0xdfeaff,1.5,26,0.5,0.45,1.4);
+torch.position.set(0,0,0.2);
+camera.add(torch); camera.add(torch.target); torch.target.position.set(0,0,-1);
+scene.add(camera);
+
+// ───────── materials ─────────
+const MAT={
+  floor:new THREE.MeshStandardMaterial({color:0x161b26,roughness:.9}),
+  mechFloor:new THREE.MeshStandardMaterial({color:0x1d2028,roughness:.95}),
+  wall:new THREE.MeshStandardMaterial({color:0x1b2130,roughness:.95}),
+  ceil:new THREE.MeshStandardMaterial({color:0x0d1119,roughness:1}),
+  rack:new THREE.MeshStandardMaterial({color:0x0e1119,roughness:.55,metalness:.5}),
+  rackFace:new THREE.MeshStandardMaterial({color:0x141926,roughness:.4,metalness:.6}),
+  steel:new THREE.MeshStandardMaterial({color:0x39415a,roughness:.5,metalness:.7}),
+  duct:new THREE.MeshStandardMaterial({color:0x4a5468,roughness:.7,metalness:.4}),
+  pipeBlue:new THREE.MeshStandardMaterial({color:0x2f5f92,roughness:.5,metalness:.5}),
+  pipeRed:new THREE.MeshStandardMaterial({color:0x8a3327,roughness:.5,metalness:.5}),
+  panel:new THREE.MeshStandardMaterial({color:0x2a3040,roughness:.6,metalness:.5}),
+  glassOff:new THREE.MeshBasicMaterial({color:0x0b1520}),
+  green:new THREE.MeshBasicMaterial({color:0x4dff9e}),
+  amber:new THREE.MeshBasicMaterial({color:0xffb020}),
+  red:new THREE.MeshBasicMaterial({color:0xff2418}),
+  cyan:new THREE.MeshBasicMaterial({color:0x5fe6ff}),
+  dark:new THREE.MeshBasicMaterial({color:0x1a1f2c})
+};
+
+const colliders=[];   // {x,z,hw,hd}
+function box(w,h,d,mat,x,y,z,solid,hwPad){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+  m.position.set(x,y,z); scene.add(m);
+  if(solid) colliders.push({x,z,hw:w/2+(hwPad||0),hd:d/2+(hwPad||0)});
+  return m;
+}
+
+// ───────── shell ─────────
+// data hall: x -14..14, z -20..18 ; mech room: x 18..36, z -8..10 ; link corridor z -1..3
+function slab(w,d,mat,x,z,y){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),mat);
+  m.rotation.x=-Math.PI/2; m.position.set(x,y||0,z); scene.add(m); return m;
+}
+slab(28,38,MAT.floor,0,-1);
+slab(18,18,MAT.mechFloor,27,1);
+slab(4,6,MAT.mechFloor,16,1);
+const ceilH=4.2;
+slab(28,38,MAT.ceil,0,-1,ceilH).rotation.x=Math.PI/2;
+slab(18,18,MAT.ceil,27,1,ceilH).rotation.x=Math.PI/2;
+
+// hall walls
+box(0.4,ceilH,38,MAT.wall,-14,ceilH/2,-1,true);
+box(0.4,ceilH,20,MAT.wall,14,ceilH/2,-9,true);
+box(0.4,ceilH,14,MAT.wall,14,ceilH/2,11,true);
+box(28,ceilH,0.4,MAT.wall,0,ceilH/2,-20,true);
+box(28,ceilH,0.4,MAT.wall,0,ceilH/2,18,true);
+// corridor + mech walls
+box(4,ceilH,0.4,MAT.wall,16,ceilH/2,-2,true);
+box(4,ceilH,0.4,MAT.wall,16,ceilH/2,4,true);
+box(0.4,ceilH,18,MAT.wall,36,ceilH/2,1,true);
+box(18,ceilH,0.4,MAT.wall,27,ceilH/2,-8,true);
+box(18,ceilH,0.4,MAT.wall,27,ceilH/2,10,true);
+box(0.4,ceilH,6,MAT.wall,18,ceilH/2,-5,true);
+box(0.4,ceilH,6,MAT.wall,18,ceilH/2,7,true);
+
+// raised-floor grid lines
+const gridHall=new THREE.GridHelper(38,38,0x243044,0x1a2231);
+gridHall.position.set(0,0.02,-1); scene.add(gridHall);
+
+// ───────── racks ─────────
+const rackLeds=[];
+function buildRack(x,z,rot){
+  const g=new THREE.Group(); g.position.set(x,0,z); g.rotation.y=rot||0; scene.add(g);
+  const body=new THREE.Mesh(new THREE.BoxGeometry(0.9,2.1,1.1),MAT.rack);
+  body.position.y=1.05; g.add(body);
+  const face=new THREE.Mesh(new THREE.BoxGeometry(0.82,1.95,0.06),MAT.rackFace);
+  face.position.set(0,1.05,0.56); g.add(face);
+  for(let i=0;i<7;i++){
+    const on=Math.random()<0.8;
+    const led=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.03,0.03),
+      new THREE.MeshBasicMaterial({color:on?0x4dff9e:0x123322}));
+    led.position.set(0,0.35+i*0.25,0.6); g.add(led);
+    if(on) rackLeds.push({led,t:Math.random()*4});
+  }
+  colliders.push({x,z,hw:(rot?0.62:0.52),hd:(rot?0.52:0.62)});
+  return g;
+}
+for(let row=0;row<4;row++){
+  const rx=[-9.5,-5.5,5.5,9.5][row];
+  for(let i=0;i<9;i++) buildRack(rx,-15+i*3.4,0);
+}
+
+// hot-aisle containment beams
+for(const rx of [-7.5,7.5]){
+  box(0.12,0.12,32,MAT.steel,rx-2,3.4,-1,false);
+  box(0.12,0.12,32,MAT.steel,rx+2,3.4,-1,false);
+}
+
+// ───────── CRAC units ─────────
+const cracs=[];
+function buildCrac(z){
+  const g=new THREE.Group(); g.position.set(-12.6,0,z); scene.add(g);
+  box(1.6,2.4,2.2,MAT.steel,-12.6,1.2,z,true,0.1);
+  const grille=new THREE.Mesh(new THREE.BoxGeometry(0.06,1.6,1.8),MAT.dark);
+  grille.position.set(-11.78,1.3,z); scene.add(grille);
+  const lamp=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.14,0.4),MAT.red);
+  lamp.position.set(-11.76,2.15,z); scene.add(lamp);
+  cracs.push({lamp});
+  return g;
+}
+[-11,-3,5].forEach(buildCrac);
+
+// overhead ducts
+for(const z of [-11,-3,5]){
+  const d=new THREE.Mesh(new THREE.BoxGeometry(9,0.7,0.9),MAT.duct);
+  d.position.set(-7.5,3.7,z); scene.add(d);
+}
+
+// ───────── mechanical room kit ─────────
+// chiller
+box(4.4,2.6,2.4,MAT.steel,26,1.3,-5.5,true,0.15);
+box(4.2,0.18,2.2,MAT.dark,26,2.68,-5.5,false);
+for(const fx of [-1.3,1.3]){
+  const fan=new THREE.Mesh(new THREE.CylinderGeometry(0.75,0.75,0.1,16),MAT.dark);
+  fan.position.set(26+fx,2.78,-5.5); scene.add(fan);
+}
+// pumps
+function buildPump(x,z){
+  box(0.9,0.5,0.9,MAT.steel,x,0.25,z,true,0.1);
+  const motor=new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.32,1.1,14),MAT.panel);
+  motor.rotation.z=Math.PI/2; motor.position.set(x,0.85,z); scene.add(motor);
+  const vol=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.42,0.5,14),MAT.pipeBlue);
+  vol.position.set(x+0.85,0.7,z); scene.add(vol);
+  const lamp=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,0.1),MAT.red);
+  lamp.position.set(x-0.55,1.2,z+0.35); scene.add(lamp);
+  return lamp;
+}
+const pumpLamp=buildPump(31,-3);
+buildPump(31,-0.6);
+
+// pipe runs
+for(const p of [[0x2f5f92,3.2],[0x8a3327,3.6]]){
+  const g=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,16,12),
+    p[0]===0x2f5f92?MAT.pipeBlue:MAT.pipeRed);
+  g.rotation.z=Math.PI/2; g.position.set(27,p[1],-6.8); scene.add(g);
+}
+// air handler
+box(3.2,2.8,2.0,MAT.steel,22,1.4,7.5,true,0.1);
+box(2.4,1.0,0.12,MAT.dark,22,1.9,6.45,false);
+
+// ───────── interactables ─────────
+const interactables=[];
+function addInteract(mesh,def){
+  mesh.userData.def=def; def.mesh=mesh; interactables.push(mesh); return def;
+}
+function panelMesh(x,y,z,w,h,rotY,mat){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,0.14),mat||MAT.panel);
+  m.position.set(x,y,z); m.rotation.y=rotY||0; scene.add(m); return m;
+}
+function screenLamp(parentMesh,color,ox,oy){
+  const l=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.16,0.03),new THREE.MeshBasicMaterial({color}));
+  l.position.set(ox||0,oy||0,0.09); parentMesh.add(l); return l;
+}
+
+// 1. site binder on a desk near the entry
+box(1.6,0.06,0.9,MAT.steel,10.5,0.78,14,true,0.1);
+box(0.08,0.78,0.08,MAT.steel,9.85,0.39,13.65,false);
+box(0.08,0.78,0.08,MAT.steel,11.15,0.39,14.35,false);
+const binder=new THREE.Mesh(new THREE.BoxGeometry(0.44,0.04,0.6),new THREE.MeshBasicMaterial({color:0xd8d2bd}));
+binder.position.set(10.5,0.83,14); binder.rotation.y=0.3; scene.add(binder);
+const D_BINDER=addInteract(binder,{
+  name:'SITE BINDER', hint:'Somebody wrote the cooling procedure down.',
+  verb:'READ', act(){ openNote(); logLine('Binder: reset the chiller, open CHW isolation, then start P-1. In that order.'); state.readBinder=true; }
+});
+
+// 2. BAS controller in the mech room
+const basPanel=panelMesh(34.8,1.6,-4,0.1,1.2,Math.PI/2);
+basPanel.geometry=new THREE.BoxGeometry(0.14,1.2,1.6);
+const basLamp=screenLamp(basPanel,0xff2418,0,0.4); basLamp.rotation.y=Math.PI/2;
+basLamp.position.set(-0.09,0.4,0);
+const D_BAS=addInteract(basPanel,{
+  name:'BAS CONTROLLER', hint:'Local keypad. Locked out.',
+  verb:'ENTER PIN',
+  locked:()=>state.readBinder?null:'No PIN. Find where the site writes things down.',
+  act(){ openPad(); }
+});
+
+// 3. chiller fault reset
+const chillerPanel=panelMesh(26,1.5,-4.25,1.1,0.9,0);
+const chillerLamp=screenLamp(chillerPanel,0xff2418,0.35,0.22);
+const D_CHILL=addInteract(chillerPanel,{
+  name:'CHILLER — FAULT', hint:'Low flow lockout. Manual reset required.',
+  verb:'RESET',
+  locked:()=>state.bas?null:'Head-end has it in hand-off. Unlock the BAS first.',
+  act(){
+    state.chiller=true; chillerLamp.material.color.setHex(0xffb020);
+    logLine('Chiller lockout cleared. It will fault again without flow.');
+    setObjective();
+  }
+});
+
+// 4. CHW isolation valve
+const valveStem=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.5,8),MAT.steel);
+valveStem.position.set(28.4,2.6,-6.8); scene.add(valveStem);
+const valveWheel=new THREE.Mesh(new THREE.TorusGeometry(0.34,0.06,8,18),MAT.pipeRed);
+valveWheel.position.set(28.4,2.9,-6.8); valveWheel.rotation.x=Math.PI/2; scene.add(valveWheel);
+const D_VALVE=addInteract(valveWheel,{
+  name:'CHW ISOLATION VALVE', hint:'Handwheel. Currently shut.',
+  verb:'OPEN',
+  locked:()=>state.chiller?null:'Opening it now just faults the chiller again. Reset it first.',
+  act(){
+    state.valve=true; valveWheel.material=MAT.pipeBlue.clone();
+    logLine('Chilled water isolation open. Flow available at the pumps.');
+    setObjective();
+  }
+});
+
+// 5. pump VFD
+const vfd=panelMesh(31,1.5,-4.6,0.8,1.0,0);
+const vfdLamp=screenLamp(vfd,0xff2418,0.25,0.28);
+const D_PUMP=addInteract(vfd,{
+  name:'P-1 VFD', hint:'Primary chilled water pump. Stopped.',
+  verb:'START',
+  locked:()=>state.valve?null:'Starting against a shut valve is how it faulted in the first place.',
+  act(){
+    state.pump=true; vfdLamp.material.color.setHex(0x4dff9e);
+    pumpLamp.material.color.setHex(0x4dff9e);
+    chillerLamp.material.color.setHex(0x4dff9e);
+    cracs.forEach(c=>c.lamp.material.color.setHex(0x4dff9e));
+    logLine('P-1 running. CRAC units picking up. Hall temperature falling.');
+    setObjective();
+  }
+});
+
+// 6. core cabinet
+const core=new THREE.Group(); core.position.set(0,0,-17.5); scene.add(core);
+const coreBody=new THREE.Mesh(new THREE.BoxGeometry(1.5,2.3,1.3),MAT.rack);
+coreBody.position.y=1.15; core.add(coreBody);
+const coreGlass=new THREE.Mesh(new THREE.BoxGeometry(1.2,1.8,0.05),
+  new THREE.MeshBasicMaterial({color:0x0a2430}));
+coreGlass.position.set(0,1.2,0.68); core.add(coreGlass);
+const coreLamp=new THREE.Mesh(new THREE.BoxGeometry(1.0,0.08,0.04),MAT.red);
+coreLamp.position.set(0,2.2,0.7); core.add(coreLamp);
+colliders.push({x:0,z:-17.5,hw:0.85,hd:0.75});
+const D_CORE=addInteract(coreGlass,{
+  name:'CORE CABINET', hint:'Thermal interlock. Door will not release while the hall is hot.',
+  verb:'HOLD E — EXTRACT',
+  locked:()=> state.temp<=82 ? null : 'Interlock holds until the hall is under 82°F. It reads '+Math.round(state.temp)+'°F.',
+  hold:7.0,
+  act(){
+    state.extracted=true; coreLamp.material.color.setHex(0x4dff9e);
+    logLine('Extraction complete. Now get out the way you came.');
+    setObjective();
+  }
+});
+
+// 7. exit door
+const exitDoor=panelMesh(13.7,1.5,15,0.14,3.0,0,MAT.dark);
+exitDoor.geometry=new THREE.BoxGeometry(0.14,3.0,1.8);
+const exitLamp=screenLamp(exitDoor,0xffb020,0,1.2);
+const D_EXIT=addInteract(exitDoor,{
+  name:'SERVICE DOOR', hint:'The way you came in.',
+  verb:'LEAVE',
+  locked:()=>state.extracted?null:'Nothing to leave with yet.',
+  act(){ finish(true); }
+});
+
+// ───────── cameras ─────────
+const seccams=[];
+function buildCam(x,z,base,sweep){
+  const g=new THREE.Group(); g.position.set(x,3.5,z); scene.add(g);
+  const bodyM=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.24,0.6),MAT.panel);
+  g.add(bodyM);
+  const lens=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.12,10),MAT.dark);
+  lens.rotation.x=Math.PI/2; lens.position.z=0.34; g.add(lens);
+  const dot=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.07,0.07),MAT.red);
+  dot.position.set(0.12,0.16,0); g.add(dot);
+  const cone=new THREE.Mesh(new THREE.ConeGeometry(3.2,11,14,1,true),
+    new THREE.MeshBasicMaterial({color:0xff5a3c,transparent:true,opacity:0.05,
+      side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
+  cone.rotation.x=Math.PI/2; cone.position.z=5.5; g.add(cone);
+  seccams.push({g,base,sweep,dot,cone,t:Math.random()*6});
+}
+buildCam(-13.2,-18.5,-0.9,0.55);
+buildCam(13.2,10,2.4,0.5);
+buildCam(34.5,8.5,3.6,0.45);
+
+// ───────── state ─────────
+const state={
+  playing:false, temp:78, peak:78, alert:0, peakAlert:0, time:0,
+  readBinder:false, bas:false, chiller:false, valve:false, pump:false,
+  extracted:false, hold:0, holdTarget:null, seen:0
+};
+
+// ───────── HUD ─────────
+const H={
+  obj:document.getElementById('objText'), objWhy:document.getElementById('objWhy'),
+  tempVal:document.getElementById('tempVal'), tempFill:document.getElementById('tempFill'),
+  tempWhy:document.getElementById('tempWhy'),
+  alertVal:document.getElementById('alertVal'), alertFill:document.getElementById('alertFill'),
+  alertWhy:document.getElementById('alertWhy'),
+  prompt:document.getElementById('prompt'), reticle:document.getElementById('reticle'),
+  log:document.getElementById('log'), progWrap:document.getElementById('progWrap'),
+  progFill:document.getElementById('progFill'), progLabel:document.getElementById('progLabel'),
+  flash:document.getElementById('flash')
+};
+
+function logLine(text,cls){
+  const d=document.createElement('div');
+  d.className='line'+(cls?' '+cls:''); d.textContent=text;
+  H.log.appendChild(d);
+  while(H.log.children.length>4) H.log.removeChild(H.log.firstChild);
+  setTimeout(()=>{ if(d.parentNode) d.parentNode.removeChild(d); }, 7000);
+}
+
+function setObjective(){
+  let t,w;
+  if(!state.bas){ t='Get into the BAS'; w='The controller is in the mechanical room, east side. It wants a four-digit PIN you do not have yet.'; }
+  else if(!state.chiller){ t='Reset the chiller'; w='Fault panel is on the face of the chiller. Order matters — reset, then valve, then pump.'; }
+  else if(!state.valve){ t='Open the CHW isolation valve'; w='Red handwheel on the pipe run above the pumps.'; }
+  else if(!state.pump){ t='Start P-1'; w='VFD on the wall behind the pumps. Flow is available now, so it will hold.'; }
+  else if(!state.extracted){
+    t='Cool the hall to 82°F, then pull the core';
+    w = state.temp>82 ? 'Cooling is running. Hall reads '+Math.round(state.temp)+'°F and falling — the cabinet unlocks under 82.'
+                      : 'Interlock released. Core cabinet is at the north end of the centre aisle.';
+  }
+  else { t='Get out'; w='Service door on the east wall where you came in.'; }
+  H.obj.textContent=t; H.objWhy.textContent=w;
+}
+
+function paintHUD(){
+  const t=state.temp;
+  H.tempVal.textContent=Math.round(t)+'°F';
+  H.tempFill.style.transform='scaleX('+Math.max(0,Math.min(1,(t-70)/40))+')';
+  if(t>=100){ H.tempWhy.textContent='Thermal shutdown imminent. Hall is cooking.'; H.tempWhy.className='why bad'; }
+  else if(!state.pump){ H.tempWhy.textContent='No cooling. It climbs until P-1 runs.'; H.tempWhy.className='why warn'; }
+  else if(t>82){ H.tempWhy.textContent='Falling. Core unlocks under 82°F.'; H.tempWhy.className='why'; }
+  else { H.tempWhy.textContent='Stable. Interlock released.'; H.tempWhy.className='why ok'; }
+
+  const a=state.alert;
+  H.alertFill.style.transform='scaleX('+Math.min(1,a/100)+')';
+  H.alertVal.textContent = a>=100?'BREACH':a>60?'TRACKING':a>15?'MOVEMENT':'CLEAR';
+  if(a>=100){ H.alertWhy.textContent='They have you.'; H.alertWhy.className='why bad'; }
+  else if(a>15){ H.alertWhy.textContent='A camera has you. Break the cone — it decays.'; H.alertWhy.className='why warn'; }
+  else { H.alertWhy.textContent='Cameras haven\'t seen you. Shift walks quiet.'; H.alertWhy.className='why'; }
+}
+
+// ───────── overlays ─────────
+const padEl=document.getElementById('pad'), padVal=document.getElementById('padVal'),
+      padHint=document.getElementById('padHint'), noteEl=document.getElementById('note');
+let padBuf='';
+function openPad(){ padBuf=''; padVal.textContent=''; padVal.className='';
+  padHint.textContent='Four-digit service PIN.'; padEl.classList.add('on'); document.exitPointerLock(); }
+function closePad(){ padEl.classList.remove('on'); }
+padEl.querySelectorAll('button').forEach(b=>{
+  b.onclick=()=>{
+    const k=b.dataset.k;
+    if(k==='x'){ closePad(); return; }
+    if(k==='c'){ padBuf=''; padVal.textContent=''; padVal.className=''; return; }
+    if(padBuf.length>=4) return;
+    padBuf+=k; padVal.textContent='•'.repeat(padBuf.length);
+    if(padBuf.length===4){
+      if(padBuf===PIN){
+        state.bas=true; basLamp.material.color.setHex(0x4dff9e);
+        padVal.textContent='OK'; padHint.textContent='Head-end released to hand control.';
+        logLine('BAS unlocked. Plant is yours.');
+        setTimeout(()=>{ closePad(); setObjective(); },700);
+      } else {
+        padVal.textContent='NO'; padVal.className='bad';
+        padHint.textContent='Rejected. Three more before it calls out.';
+        state.alert=Math.min(100,state.alert+12);
+        setTimeout(()=>{ padBuf=''; padVal.textContent=''; padVal.className=''; },700);
+      }
+    }
+  };
+});
+function openNote(){ noteEl.classList.add('on'); document.exitPointerLock(); }
+noteEl.onclick=()=>noteEl.classList.remove('on');
+
+// ───────── input ─────────
+const keys={};
+let yaw=Math.PI, pitch=0, locked=false;
+addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  keys[k]=true;
+  if(k==='f'){ torch.visible=!torch.visible; }
+});
+addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; });
+addEventListener('mousemove',e=>{
+  if(!locked) return;
+  yaw-=e.movementX*0.0022;
+  pitch-=e.movementY*0.0022;
+  pitch=Math.max(-1.25,Math.min(1.25,pitch));
+});
+document.addEventListener('pointerlockchange',()=>{ locked=document.pointerLockElement===document.body; });
+renderer.domElement.addEventListener('click',()=>{
+  if(state.playing && !padEl.classList.contains('on') && !noteEl.classList.contains('on'))
+    document.body.requestPointerLock();
+});
+
+// ───────── movement ─────────
+const P={x:11,z:15.5,vx:0,vz:0};
+function blocked(nx,nz){
+  for(const c of colliders){
+    if(Math.abs(nx-c.x)<c.hw+0.38 && Math.abs(nz-c.z)<c.hd+0.38) return true;
+  }
+  return false;
+}
+function move(dt){
+  const quiet=keys['shift'];
+  const spd=(quiet?1.9:3.5);
+  let fx=0,fz=0;
+  if(keys['w']) fz-=1; if(keys['s']) fz+=1;
+  if(keys['a']) fx-=1; if(keys['d']) fx+=1;
+  const len=Math.hypot(fx,fz)||1; fx/=len; fz/=len;
+  const sin=Math.sin(yaw), cos=Math.cos(yaw);
+  const wx=fx*cos - fz*sin, wz=fx*sin + fz*cos;
+  const tx=wx*spd, tz=wz*spd;
+  P.vx+=(tx-P.vx)*Math.min(1,dt*12);
+  P.vz+=(tz-P.vz)*Math.min(1,dt*12);
+  const nx=P.x+P.vx*dt, nz=P.z+P.vz*dt;
+  if(!blocked(nx,P.z)) P.x=nx; else P.vx=0;
+  if(!blocked(P.x,nz)) P.z=nz; else P.vz=0;
+  const bob=Math.sin(performance.now()*0.011)*Math.min(0.045,Math.hypot(P.vx,P.vz)*0.014);
+  camera.position.set(P.x,1.65+bob,P.z);
+  camera.rotation.set(pitch,yaw,0);
+  return quiet;
+}
+
+// ───────── interaction ─────────
+const ray=new THREE.Raycaster();
+const centre=new THREE.Vector2(0,0);
+let focus=null;
+function scan(){
+  ray.setFromCamera(centre,camera);
+  const hits=ray.intersectObjects(interactables,false);
+  const hit=(hits.length && hits[0].distance<3.4) ? hits[0].object : null;
+  focus = hit ? hit.userData.def : null;
+  if(!focus){
+    H.prompt.classList.remove('on'); H.reticle.classList.remove('hot');
+    if(state.holdTarget){ state.holdTarget=null; state.hold=0; H.progWrap.classList.remove('on'); }
+    return;
+  }
+  H.reticle.classList.add('hot');
+  const why = focus.locked ? focus.locked() : null;
+  H.prompt.className='on'+(why?' locked':'');
+  H.prompt.innerHTML='<b>'+focus.name+'</b><i>'+(why||focus.hint)+'</i>'
+    + (why?'':'<em>'+focus.verb+'</em>');
+}
+function tryUse(dt){
+  if(!focus) return;
+  const why = focus.locked ? focus.locked() : null;
+  if(why) return;
+  if(focus.hold){
+    if(state.holdTarget!==focus){ state.holdTarget=focus; state.hold=0; }
+    state.hold+=dt;
+    H.progWrap.classList.add('on');
+    H.progLabel.textContent='EXTRACTING — '+Math.round(state.hold/focus.hold*100)+'%';
+    H.progFill.style.transform='scaleX('+Math.min(1,state.hold/focus.hold)+')';
+    if(state.hold>=focus.hold){
+      H.progWrap.classList.remove('on'); state.holdTarget=null; state.hold=0;
+      focus.act();
+    }
+  } else if(!focus.used){
+    focus.used=true; focus.act();
+  }
+}
+
+// ───────── loop ─────────
+let last=performance.now();
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt=Math.min((now-last)/1000,0.05); last=now;
+
+  rackLeds.forEach(r=>{
+    r.t+=dt;
+    if(r.t>0.6+Math.random()){ r.t=0;
+      r.led.material.color.setHex(Math.random()<0.85?0x4dff9e:0x123322); }
+  });
+
+  if(state.playing){
+    state.time+=dt;
+    const quiet=move(dt);
+    scan();
+    if(keys['e']) tryUse(dt);
+    else if(state.holdTarget){ state.holdTarget=null; state.hold=0; H.progWrap.classList.remove('on'); }
+
+    // thermal model
+    if(state.pump) state.temp += (72-state.temp)*dt*0.11;
+    else state.temp += 0.62*dt + (state.extracted?0.3*dt:0);
+    state.peak=Math.max(state.peak,state.temp);
+    if(state.temp>=105){ finish(false,'thermal'); }
+
+    // cameras
+    let spotted=false;
+    seccams.forEach(c=>{
+      c.t+=dt;
+      c.g.rotation.y = c.base + Math.sin(c.t*c.sweep)*0.85;
+      const dx=P.x-c.g.position.x, dz=P.z-c.g.position.z;
+      const dist=Math.hypot(dx,dz);
+      if(dist<11){
+        const facing=new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0),c.g.rotation.y);
+        const toP=new THREE.Vector3(dx,0,dz).normalize();
+        if(facing.dot(toP)>0.90) spotted=true;
+      }
+      c.dot.material.color.setHex(spotted?0xff2418:0x5a1410);
+      c.cone.material.opacity = spotted?0.11:0.05;
+    });
+    state.seen = spotted ? state.seen+dt : 0;
+    if(spotted) state.alert=Math.min(100,state.alert + dt*(quiet?11:26));
+    else state.alert=Math.max(0,state.alert - dt*9);
+    state.peakAlert=Math.max(state.peakAlert,state.alert);
+    H.flash.style.opacity = spotted ? 0.07 : 0;
+    if(state.alert>=100) finish(false,'caught');
+
+    paintHUD();
+  }
+
+  renderer.render(scene,camera);
+}
+
+// ───────── run control ─────────
+const menu=document.getElementById('menu'), endS=document.getElementById('end');
+function start(){
+  Object.assign(state,{playing:true,temp:78,peak:78,alert:0,peakAlert:0,time:0,
+    readBinder:false,bas:false,chiller:false,valve:false,pump:false,extracted:false,hold:0,holdTarget:null,seen:0});
+  interactables.forEach(m=>{ if(m.userData.def) m.userData.def.used=false; });
+  chillerLamp.material.color.setHex(0xff2418);
+  vfdLamp.material.color.setHex(0xff2418);
+  pumpLamp.material.color.setHex(0xff2418);
+  basLamp.material.color.setHex(0xff2418);
+  coreLamp.material.color.setHex(0xff2418);
+  cracs.forEach(c=>c.lamp.material.color.setHex(0xff2418));
+  P.x=11; P.z=15.5; P.vx=0; P.vz=0; yaw=Math.PI; pitch=0;
+  torch.visible=true;
+  menu.classList.add('hidden'); endS.classList.add('hidden');
+  setObjective(); paintHUD();
+  logLine('In. Hall is warm and getting warmer.','warn');
+  document.body.requestPointerLock();
+}
+function finish(won,why){
+  if(!state.playing) return;
+  state.playing=false; document.exitPointerLock();
+  H.prompt.classList.remove('on'); H.progWrap.classList.remove('on'); H.flash.style.opacity=0;
+  const m=Math.floor(state.time/60), s=Math.floor(state.time%60);
+  document.getElementById('eTime').textContent=m+':'+String(s).padStart(2,'0');
+  document.getElementById('ePeak').textContent=Math.round(state.peak)+'°F';
+  document.getElementById('eAlert').textContent=Math.round(state.peakAlert)+'%';
+  document.getElementById('endTitle').textContent = won?'OUT CLEAN':(why==='thermal'?'THERMAL SHUTDOWN':'BURNED');
+  document.getElementById('endWhy').textContent = won
+    ? 'Cooling restored, cabinet pulled, nobody watching. The irony is you had to fix the building before you could rob it.'
+    : why==='thermal'
+      ? 'The hall hit 105°F and dropped the floor. You spent too long working out the order — reset the chiller, open the valve, then start the pump.'
+      : 'A camera held you long enough to call it in. Shift halves how fast they build a track, and breaking the cone bleeds it back off.';
+  endS.classList.remove('hidden');
+}
+document.getElementById('startBtn').onclick=start;
+document.getElementById('againBtn').onclick=start;
+document.getElementById('driveBtn').onclick=()=>location.href='index.html';
+document.getElementById('endBackBtn').onclick=()=>location.href='index.html';
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

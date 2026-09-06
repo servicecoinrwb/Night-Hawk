@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NIGHT HAWK</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,500;0,600;0,700;1,700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#05060e;--scan:#ff2418;--cyan:#5fe6ff;--amber:#ffb020;
+    --violet:#b026ff;--green:#4dff9e;--steel:#8f9ab8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    min-height:100%;background:var(--ink);color:#e8ecf7;
+    font-family:'Chakra Petch',system-ui,sans-serif;
+    background-image:
+      radial-gradient(ellipse 90% 55% at 50% -10%,rgba(122,21,80,.42),transparent 70%),
+      radial-gradient(ellipse 70% 45% at 50% 105%,rgba(20,8,50,.7),transparent 70%);
+    background-attachment:fixed;
+  }
+  /* horizon grid */
+  body::before{
+    content:'';position:fixed;left:0;right:0;bottom:0;height:38vh;pointer-events:none;z-index:0;
+    background-image:
+      repeating-linear-gradient(to right,rgba(176,38,255,.22) 0 1px,transparent 1px 62px),
+      repeating-linear-gradient(to bottom,rgba(176,38,255,.20) 0 1px,transparent 1px 44px);
+    transform:perspective(320px) rotateX(66deg);transform-origin:bottom center;
+    mask-image:linear-gradient(to bottom,transparent,#000 55%);
+    -webkit-mask-image:linear-gradient(to bottom,transparent,#000 55%);
+  }
+  .wrap{position:relative;z-index:1;max-width:940px;margin:0 auto;padding:clamp(38px,8vh,90px) 22px 70px}
+
+  header{text-align:center;margin-bottom:8px}
+  .kicker{font-size:11px;font-weight:700;letter-spacing:5px;color:var(--steel)}
+  h1{font-size:clamp(52px,13vw,124px);font-weight:700;font-style:italic;letter-spacing:-4px;
+    line-height:.84;margin-top:8px}
+  .scanbar{width:min(540px,90%);height:12px;margin:20px auto 0;position:relative;
+    background:#14060a;border:1px solid rgba(255,36,24,.32);overflow:hidden}
+  .scanbar i{position:absolute;top:0;bottom:0;width:22%;
+    background:linear-gradient(90deg,transparent,var(--scan) 45%,#ffd0cb 50%,var(--scan) 55%,transparent);
+    animation:sweep 2.1s cubic-bezier(.45,0,.55,1) infinite}
+  @keyframes sweep{0%{left:-22%}50%{left:100%}100%{left:-22%}}
+  @media (prefers-reduced-motion:reduce){.scanbar i{animation:none;left:39%}}
+  .lede{font-size:16px;font-weight:600;color:var(--steel);max-width:60ch;margin:22px auto 0;
+    line-height:1.6;text-align:center}
+  .lede em{color:#e8ecf7;font-style:normal}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;margin-top:52px}
+  .card{position:relative;border:1px solid rgba(255,255,255,.10);background:rgba(8,10,20,.66);
+    padding:28px 26px 26px;display:flex;flex-direction:column;
+    transition:border-color .16s ease,transform .16s ease}
+  .card:hover{border-color:rgba(255,255,255,.26);transform:translateY(-3px)}
+  .card::before{content:'';position:absolute;left:0;right:0;top:0;height:3px}
+  .card.drive::before{background:linear-gradient(90deg,var(--scan),rgba(255,36,24,0))}
+  .card.walk::before{background:linear-gradient(90deg,var(--cyan),rgba(95,230,255,0))}
+  .tagline{font-size:10.5px;font-weight:700;letter-spacing:2.6px;color:var(--steel)}
+  .card h2{font-size:34px;font-weight:700;font-style:italic;letter-spacing:-1px;margin-top:6px;line-height:1}
+  .card.drive h2{color:#fff}
+  .card.walk h2{color:#fff}
+  .card p{font-size:14px;font-weight:500;color:var(--steel);line-height:1.6;margin-top:14px}
+  .card p b{color:#e8ecf7;font-weight:700}
+  .facts{list-style:none;margin-top:16px;display:flex;flex-wrap:wrap;gap:6px}
+  .facts li{font-size:11px;font-weight:600;letter-spacing:.4px;color:#cfd6e8;
+    border:1px solid rgba(255,255,255,.14);padding:3px 9px}
+  .card a.play{margin-top:auto;align-self:flex-start;text-decoration:none;
+    font-size:17px;font-weight:700;font-style:italic;letter-spacing:.4px;padding:12px 32px;
+    margin-top:24px;clip-path:polygon(0 0,100% 0,calc(100% - 13px) 100%,0 100%);
+    transition:box-shadow .14s ease,transform .14s ease}
+  .card.drive a.play{background:var(--scan);color:#0a0206;box-shadow:0 0 28px rgba(255,36,24,.36)}
+  .card.walk a.play{background:var(--cyan);color:#02141a;box-shadow:0 0 28px rgba(95,230,255,.34)}
+  .card a.play:hover{transform:translateY(-2px)}
+  .card a.play:focus-visible{outline:2px solid #fff;outline-offset:4px}
+
+  .section{margin-top:54px}
+  .section h3{font-size:11px;font-weight:700;letter-spacing:3px;color:var(--steel);
+    padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.09)}
+  .modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-top:20px}
+  .mode b{display:block;font-size:15px;font-weight:700;color:#fff}
+  .mode span{display:block;font-size:13px;font-weight:500;color:var(--steel);margin-top:5px;line-height:1.55}
+  .mode.a b{color:var(--scan)}.mode.b b{color:var(--cyan)}.mode.c b{color:var(--green)}
+
+  table{width:100%;border-collapse:collapse;margin-top:16px}
+  td{font-size:13.5px;font-weight:500;color:var(--steel);padding:8px 0;
+    border-bottom:1px solid rgba(255,255,255,.06);vertical-align:top}
+  td:first-child{width:130px}
+  kbd{font-family:inherit;font-size:11.5px;font-weight:700;color:#fff;background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.16);padding:2px 8px;margin-right:5px;display:inline-block}
+
+  footer{margin-top:56px;padding-top:20px;border-top:1px solid rgba(255,255,255,.07);
+    font-size:12px;font-weight:500;color:#3e465e;line-height:1.7}
+  footer b{color:var(--steel);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="kicker">INTERSTATE 9 &nbsp;·&nbsp; 2:14 AM</div>
+    <h1>NIGHT<br>HAWK</h1>
+    <div class="scanbar"><i></i></div>
+    <p class="lede">Two games off one night. <em>Drive the car</em> or <em>walk the building</em> — a black coupe with a red scanner bar running an interstate that wants it dead, and a colo data hall where the score is locked behind a chiller somebody let fault out.</p>
+  </header>
+
+  <div class="cards">
+
+    <div class="card drive">
+      <div class="tagline">THE CAR</div>
+      <h2>NIGHT HAWK</h2>
+      <p>Endless night highway. Squeeze past traffic to build a multiplier up to <b>x8</b>, run the guns without cooking the barrels, drop oil on whatever is riding your bumper — and when the hull is shot, catch the <b>supply semi</b> and drive straight into the back of it.</p>
+      <ul class="facts">
+        <li>3D driving</li><li>Machine gun + oil</li><li>Road work &amp; spills</li>
+        <li>Live synth score</li><li>Run timer</li>
+      </ul>
+      <a class="play" href="night-hawk.html">Drive</a>
+    </div>
+
+    <div class="card walk">
+      <div class="tagline">THE BUILDING</div>
+      <h2>COLD AISLE</h2>
+      <p>First person, no car. The core cabinet is thermally interlocked and the hall is climbing past 78°F. Get into the BAS, reset the chiller, open the isolation valve, start P-1 — <b>you have to fix the building before you can rob it.</b> Then get out before the cameras finish their track.</p>
+      <ul class="facts">
+        <li>First-person</li><li>Real plant sequence</li><li>Thermal clock</li>
+        <li>Camera stealth</li><li>Keypad + notes</li>
+      </ul>
+      <a class="play" href="cold-aisle.html">Go in</a>
+    </div>
+
+  </div>
+
+  <div class="section">
+    <h3>MODES</h3>
+    <div class="modes">
+      <div class="mode a"><b>Action run</b><span>The full drive. Three hunter crews — rammers on your bumper, blade cars alongside, gun cars out front shooting back. Three panels of hull.</span></div>
+      <div class="mode b"><b>Cruise run</b><span>Same road, nobody hunting. Weapons stowed, five panels, denser traffic. Just you, the road work and the spills.</span></div>
+      <div class="mode c"><b>Cold Aisle</b><span>The side job. One route through a data hall and a mechanical room, two ways to blow it: 105°F or a completed camera track.</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>CONTROLS</h3>
+    <table>
+      <tr><td><b>Driving</b></td><td>
+        <kbd>← →</kbd> steer &nbsp; <kbd>Space</kbd> guns &nbsp; <kbd>↓</kbd> brake &nbsp; <kbd>E</kbd> oil &nbsp;
+        <kbd>Shift</kbd> turbo &nbsp; <kbd>J</kbd> hop
+      </td></tr>
+      <tr><td><b>On foot</b></td><td>
+        <kbd>W A S D</kbd> move &nbsp; <kbd>Mouse</kbd> look &nbsp; <kbd>E</kbd> use &nbsp;
+        <kbd>Shift</kbd> quiet &nbsp; <kbd>F</kbd> flashlight
+      </td></tr>
+      <tr><td><b>Both</b></td><td>
+        <kbd>P</kbd> pause &nbsp; <kbd>M</kbd> mute &nbsp; <kbd>N</kbd> music off &nbsp; <kbd>Esc</kbd> back out
+      </td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h3>NOTES</h3>
+    <table>
+      <tr><td><b>Soundtrack</b></td><td>Written in code, not recorded — a four-bar minor progression sequenced live in Web Audio. Tempo and filter cutoff track your speed, and the layers stack as hostiles arrive. No audio files, nothing to load.</td></tr>
+      <tr><td><b>Built with</b></td><td>Two single HTML files. three.js r128 off a CDN, everything else hand-rolled. No build step, no framework, no dependencies to install — open the file and it runs.</td></tr>
+      <tr><td><b>Scores</b></td><td>Best score and longest run are held in memory for the session only. They reset when you reload.</td></tr>
+    </table>
+  </div>
+
+  <footer>
+    <b>Original build.</b> Not affiliated with, endorsed by, or derived from any television or arcade property. Every asset, mechanic and note of music here was made from scratch.
+  </footer>
+
+</div>
+</body>
+</html>
