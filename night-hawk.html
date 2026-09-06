@@ -303,29 +303,21 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="night.js"></script>
 <script>
 (function(){
 'use strict';
 
-// ───────── campaign chaining (shared shape across all three files) ─────────
-const CQ=new URLSearchParams(location.search);
-const CAMPAIGN=CQ.get('campaign')==='1';
-const LEG=+(CQ.get('leg')||0);
-const CTIME=+(CQ.get('t')||0);
-const CDOWN=+(CQ.get('down')||0);
-const CHAIN=[
-  'night-hawk.html?campaign=1&leg=1&dist=2600',
-  'dark-fiber.html?campaign=1&leg=2',
-  'night-hawk.html?campaign=1&leg=3&dist=3600',
-  'night-deposit.html?campaign=1&leg=4'
-];
-const LEGNAME=['','RUN OUT TO THE COLO','THE COLO','RUN ACROSS TOWN','THE BANK'];
-function nextLegURL(addTime,addDown){
-  const n=CHAIN[LEG];
-  if(!CAMPAIGN||!n) return null;
-  return n+'&t='+Math.round(CTIME+(addTime||0))+'&down='+(CDOWN+(addDown||0));
-}
-function legTotal(addTime){ return Math.round(CTIME+(addTime||0)); }
+// ───────── campaign chaining (definitions live in night.js) ─────────
+const CQ=Night.q;
+const CAMPAIGN=Night.campaign;
+const LEG=Night.leg;
+const CTIME=Night.time;
+const CDOWN=Night.down;
+const CHAIN=Night.CHAIN;
+const LEGNAME=Night.NAMES;
+function nextLegURL(addTime,addDown){ return Night.nextURL(addTime,addDown); }
+function legTotal(addTime){ return Night.total(addTime); }
 
 const CFG = {
   laneX:[-6.2,-2.1,2.1,6.2],
@@ -1216,7 +1208,9 @@ function endRun(cause){
     : cause==='clock'?'TIME OUT'
     : cause==='rail'?'INTO THE RAIL':cause==='blade'?'CUT DOWN':'WRECKED';
   el.verdict.textContent =
-    cause==='arrive' ? 'Lights off, engine off, half a block back from the building. From here you walk.'
+    cause==='arrive' ? (S.gameMode==='action'
+        ? 'You lost them three streets back. Lights off, engine off, half a block short of the building. From here you walk.'
+        : 'Lights off, engine off, half a block back from the building. From here you walk.')
     : cause==='finish' ? 'Four gates and into the back of the trailer at '+clockText(S.time,false)+'. Crashes cost '+CFG.crashPenalty+' seconds each — a clean run beats a fast one.'
     : cause==='clock' ? (S.finishing
         ? 'Clock died with the trailer in sight. The last leg has no gate to buy you time — you have to be in the back of that truck before it runs out.'
@@ -1318,14 +1312,17 @@ document.getElementById('startCruise').onclick=()=>startRun('cruise');
 document.getElementById('startTrial').onclick=()=>startRun('trial');
 if(CAMPAIGN && CQ.get('dist')){
   const d=+CQ.get('dist');
+  const hostile=CQ.get('hostile')==='1';
   document.getElementById('startCruise').style.display='none';
   document.getElementById('startTrial').style.display='none';
   const b=document.getElementById('startAction');
-  b.textContent='Drive to the site';
-  b.onclick=()=>startRun('cruise',d);
+  b.textContent = hostile ? 'Run the gauntlet' : 'Drive to the site';
+  b.onclick=()=>startRun(hostile?'action':'cruise',d);
   document.querySelector('#menu .modeNote').innerHTML =
-    '<b>Leg '+LEG+' — '+(LEGNAME[LEG]||'transit')+'.</b> '+d.toLocaleString()+
-    ' metres of open road with nothing hunting you. Get there in one piece.';
+    '<b>Leg '+LEG+' — '+(LEGNAME[LEG]||'transit')+'.</b> '+d.toLocaleString()+' metres. '+
+    (hostile
+      ? 'They know something happened at the last place. Interceptors, blade cars and gun cars on this one — guns and oil are live, and the supply semi is out there if you get chewed up.'
+      : 'Open road, nothing hunting you. Get there in one piece.');
 }
 document.getElementById('againBtn').onclick=()=>startRun(S.gameMode);
 document.getElementById('resumeBtn').onclick=togglePause;
