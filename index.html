@@ -57,6 +57,8 @@
   .card::before{content:'';position:absolute;left:0;right:0;top:0;height:3px}
   .card.drive::before{background:linear-gradient(90deg,var(--scan),rgba(255,36,24,0))}
   .card.walk::before{background:linear-gradient(90deg,var(--cyan),rgba(95,230,255,0))}
+  .card.bank::before{background:linear-gradient(90deg,#d8b25a,rgba(216,178,90,0))}
+  .card.bank a.play{background:#d8b25a;color:#1a1202;box-shadow:0 0 28px rgba(216,178,90,.34)}
   .tagline{font-size:10.5px;font-weight:700;letter-spacing:2.6px;color:var(--steel)}
   .card h2{font-size:34px;font-weight:700;font-style:italic;letter-spacing:-1px;margin-top:6px;line-height:1}
   .card.drive h2{color:#fff}
@@ -139,6 +141,17 @@
       <a class="play" href="dark-fiber.html">Go in</a>
     </div>
 
+    <div class="card bank">
+      <div class="tagline">THE BANK</div>
+      <h2>NIGHT DEPOSIT</h2>
+      <p>Four floors and the only way in is off the roof. Down through the offices and the security floor, badge past the stair door, pull four server racks — then <b>the clock starts and the only way out is back up.</b> Cut the annunciator on the way down and your run out nearly doubles.</p>
+      <ul class="facts">
+        <li>Four levels</li><li>Stair tower descent</li><li>Keycard off a guard</li>
+        <li>Timed escape</li><li>Per-floor map</li>
+      </ul>
+      <a class="play" href="night-deposit.html">Go up</a>
+    </div>
+
   </div>
 
   <div class="section">
@@ -146,6 +159,7 @@
     <div class="modes">
       <div class="mode a"><b>Action run</b><span>The full drive. Three hunter crews — rammers on your bumper, blade cars alongside, gun cars out front shooting back. Three panels of hull.</span></div>
       <div class="mode b"><b>Cruise run</b><span>Same road, nobody hunting. Weapons stowed, five panels, denser traffic. Just you, the road work and the spills.</span></div>
+      <div class="mode d" style="--x:1"><b style="color:#d8b25a">Night Deposit</b><span>The bank job. Roof entry, four floors down to the server room, then run the whole route backwards before the bell.</span></div>
       <div class="mode c"><b>Dark Fiber</b><span>The side job. Sneak the floor, read what people left lying around, put guards down quietly. One way to blow it: let a guard fill his meter.</span></div>
     </div>
   </div>
