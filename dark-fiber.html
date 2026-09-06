@@ -211,6 +211,7 @@
     <div class="key"><b>F</b><span>Flashlight. They can see it.</span></div>
     <div class="key"><b>M / N</b><span>Mute everything, or just the music.</span></div>
     <div class="key"><b>H</b><span>Quick check — pull this up any time.</span></div>
+    <div class="key"><b>Deck</b><span>Stairs at the south end of the east racks. Guards below can't see up.</span></div>
     <div class="key"><b>Cameras</b><span>Sweeping, ceiling-mounted. Racks block them, crouching doesn't.</span></div>
   </div>
 
@@ -244,7 +245,9 @@
     <em>Crouching beats guards, not cameras</em> — they're overhead.
     <em>The lighting panel</em> in the mechanical room blinds guards for about 25 seconds; cameras keep most of their range.
     <em>The security NVR</em> in the north-west corner of the hall kills every camera for about 30 — but it sits directly under one, and pulling the uplink takes two seconds of standing still.
-    <em>A body left in the open</em> raises the floor on its own.
+    <em>A body left in the open</em> gets walked to and called in — about six seconds once he sees it.
+    <em>The mezzanine</em> is out of sight of every guard on the floor, but the cameras cover it.
+    <em>The ducts</em> run between the deck and the mechanical room and skip the guarded corridor — crouch to get in.
     The keypad won't assemble until all three clue fragments are in hand.
   </p>
   <div class="btnRow">
@@ -319,7 +322,7 @@ const colliders=[];
 function box(w,h,d,mat,x,y,z,solid,pad){
   const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
   m.position.set(x,y,z); scene.add(m);
-  if(solid) colliders.push({x,z,hw:w/2+(pad||0),hd:d/2+(pad||0)});
+  if(solid) colliders.push({x,z,hw:w/2+(pad||0),hd:d/2+(pad||0),top:y+h/2});
   return m;
 }
 function slab(w,d,mat,x,z,y){
@@ -328,18 +331,18 @@ function slab(w,d,mat,x,z,y){
 }
 
 // ───────── shell ─────────
-const ceilH=4.2;
+const ceilH=4.2, hallH=7.4;
 slab(28,38,MAT.floor,0,-1);
 slab(18,18,MAT.mechFloor,27,1);
 slab(4,6,MAT.mechFloor,16,1);
-slab(28,38,MAT.ceil,0,-1,ceilH).rotation.x=Math.PI/2;
+slab(28,38,MAT.ceil,0,-1,hallH).rotation.x=Math.PI/2;
 slab(18,18,MAT.ceil,27,1,ceilH).rotation.x=Math.PI/2;
 
-box(0.4,ceilH,38,MAT.wall,-14,ceilH/2,-1,true);
-box(0.4,ceilH,20,MAT.wall,14,ceilH/2,-9,true);
-box(0.4,ceilH,14,MAT.wall,14,ceilH/2,11,true);
-box(28,ceilH,0.4,MAT.wall,0,ceilH/2,-20,true);
-box(28,ceilH,0.4,MAT.wall,0,ceilH/2,18,true);
+box(0.4,hallH,38,MAT.wall,-14,hallH/2,-1,true);
+box(0.4,hallH,20,MAT.wall,14,hallH/2,-9,true);
+box(0.4,hallH,14,MAT.wall,14,hallH/2,11,true);
+box(28,hallH,0.4,MAT.wall,0,hallH/2,-20,true);
+box(28,hallH,0.4,MAT.wall,0,hallH/2,18,true);
 box(4,ceilH,0.4,MAT.wall,16,ceilH/2,-2,true);
 box(4,ceilH,0.4,MAT.wall,16,ceilH/2,4,true);
 box(0.4,ceilH,18,MAT.wall,36,ceilH/2,1,true);
@@ -347,6 +350,44 @@ box(18,ceilH,0.4,MAT.wall,27,ceilH/2,-8,true);
 box(18,ceilH,0.4,MAT.wall,27,ceilH/2,10,true);
 box(0.4,ceilH,6,MAT.wall,18,ceilH/2,-5,true);
 box(0.4,ceilH,6,MAT.wall,18,ceilH/2,7,true);
+
+// ───────── mezzanine: a catwalk deck down the east side of the hall ─────────
+const DECK={y:3.4, x0:10.3, x1:13.8, z0:-18.5, z1:9.0};
+const STAIR={x0:10.3, x1:13.8, z0:9.0, z1:15.5};  // rises from the floor at z1 up to the deck at z0
+const platforms=[{x:(DECK.x0+DECK.x1)/2, z:(DECK.z0+DECK.z1)/2,
+                  hw:(DECK.x1-DECK.x0)/2, hd:(DECK.z1-DECK.z0)/2, y:DECK.y}];
+function inStair(x,z){ return x>STAIR.x0 && x<STAIR.x1 && z>STAIR.z0 && z<STAIR.z1; }
+function stairY(z){
+  const t=(STAIR.z1-z)/(STAIR.z1-STAIR.z0);
+  return Math.max(0,Math.min(DECK.y, t*DECK.y));
+}
+(function buildMezz(){
+  const deck=new THREE.Mesh(new THREE.BoxGeometry(DECK.x1-DECK.x0,0.22,DECK.z1-DECK.z0),MAT.steel);
+  deck.position.set((DECK.x0+DECK.x1)/2, DECK.y-0.11, (DECK.z0+DECK.z1)/2); scene.add(deck);
+  // open grating look
+  const g=new THREE.GridHelper(DECK.z1-DECK.z0,14,0x2c364d,0x222a3c);
+  g.position.set((DECK.x0+DECK.x1)/2, DECK.y+0.01, (DECK.z0+DECK.z1)/2); scene.add(g);
+  // support posts
+  for(let z=DECK.z0+2; z<DECK.z1; z+=5){
+    box(0.2,DECK.y,0.2,MAT.steel,DECK.x0+0.3,DECK.y/2,z,false);
+  }
+  // railing on the open (west) edge, blocks only while you are up top
+  for(let z=DECK.z0; z<DECK.z1; z+=2.4){
+    box(0.1,1.05,0.1,MAT.steel,DECK.x0,DECK.y+0.52,z,false);
+  }
+  const rail=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,DECK.z1-DECK.z0),MAT.steel);
+  rail.position.set(DECK.x0,DECK.y+1.02,(DECK.z0+DECK.z1)/2); scene.add(rail);
+  colliders.push({x:DECK.x0-0.05,z:(DECK.z0+DECK.z1)/2,hw:0.28,hd:(DECK.z1-DECK.z0)/2,
+                  top:DECK.y+1.1, floor:DECK.y-0.2});
+  // stair treads
+  const n=13;
+  for(let i=0;i<n;i++){
+    const z=STAIR.z1-(i+0.5)*((STAIR.z1-STAIR.z0)/n);
+    box(DECK.x1-DECK.x0,0.12,(STAIR.z1-STAIR.z0)/n,MAT.steel,(DECK.x0+DECK.x1)/2,stairY(z)-0.06,z,false);
+  }
+  // small office box on the deck, north end
+  box(0.14,2.4,4.0,MAT.wall,DECK.x0+0.1,DECK.y+1.2,-15.5,true);
+})();
 
 const grid=new THREE.GridHelper(38,38,0x243044,0x1a2231);
 grid.position.set(0,0.02,-1); scene.add(grid);
@@ -364,7 +405,7 @@ function buildRack(x,z){
     led.position.set(0,0.35+i*0.25,0.6); g.add(led);
     if(on) rackLeds.push({led,t:Math.random()*4});
   }
-  colliders.push({x,z,hw:0.52,hd:0.62});
+  colliders.push({x,z,hw:0.52,hd:0.62,top:2.1});
 }
 for(const rx of [-9.5,-5.5,5.5,9.5]) for(let i=0;i<9;i++) buildRack(rx,-15+i*3.4);
 
@@ -403,8 +444,8 @@ const clues=[
   {id:'note', got:false, title:'Sticky note, under the NOC keyboard',
    text:'Whoever sits here got tired of calling security for the cabinet. "Cage door — starts with the row we decommissioned. Row '+CODE_A+'."',
    frag:'First digit: '+CODE_A},
-  {id:'log', got:false, title:'Sign-in sheet, mechanical room',
-   text:'A clipboard by the air handler. Last four entries are the same contractor, same two digits scrawled in the access column every time: '+CODE_B+'.',
+  {id:'log', got:false, title:'Sign-in sheet, deck office',
+   text:'A clipboard in the little office up on the mezzanine. Last four entries are the same contractor, same two digits scrawled in the access column every time: '+CODE_B+'.',
    frag:'Middle digits: '+CODE_B},
   {id:'badge', got:false, title:'Guard badge',
    text:'Lifted off a guard. Laminated card, and somebody has written the last digit of the cabinet code on the back in marker so they don\'t have to remember it: '+CODE_C+'.',
@@ -427,9 +468,9 @@ addInteract(sticky,{
 
 // clipboard in the mech room
 const clip=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.4,0.03),MAT.paper);
-clip.position.set(22,1.5,6.4); scene.add(clip);
+clip.position.set(10.95,4.9,-15.5); clip.rotation.y=Math.PI/2; scene.add(clip);
 addInteract(clip,{
-  name:'SIGN-IN SHEET', hint:'Contractor log hanging off the air handler.', verb:'READ',
+  name:'SIGN-IN SHEET', hint:'Contractor log hanging in the deck office.', verb:'READ',
   act(){ takeClue('log'); }
 });
 
@@ -441,7 +482,7 @@ const cabDoor=new THREE.Mesh(new THREE.BoxGeometry(0.08,1.7,1.35),MAT.steel);
 cabDoor.position.set(-0.52,1.05,0); cab.add(cabDoor);
 const cabLamp=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.12,0.3),MAT.red);
 cabLamp.position.set(-0.57,1.85,0); cab.add(cabLamp);
-colliders.push({x:34.4,z:7.5,hw:0.7,hd:0.9});
+colliders.push({x:34.4,z:7.5,hw:0.7,hd:0.9,top:2.0});
 const D_CAB=addInteract(cabDoor,{
   name:'SECURE CABINET', hint:'Keypad lock. Four digits.', verb:'ENTER CODE',
   locked:()=> state.disc ? 'Already emptied.' : null,
@@ -502,7 +543,7 @@ for(let i=0;i<4;i++){
 const nvrCable=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.9,6),
   new THREE.MeshStandardMaterial({color:0xffb020,roughness:.8}));
 nvrCable.rotation.z=0.5; nvrCable.position.set(0.42,2.35,0.3); nvr.add(nvrCable);
-colliders.push({x:-13.4,z:-16.2,hw:0.35,hd:0.7});
+colliders.push({x:-13.4,z:-16.2,hw:0.35,hd:0.7,top:2.1});
 addInteract(nvrFace,{
   name:'SECURITY NVR',
   hint:()=> state.camsDown>0 ? 'Uplink already pulled. It reboots on its own.'
@@ -517,6 +558,42 @@ addInteract(nvrFace,{
   }
 });
 
+// ───────── vents ─────────
+// The only ground link between hall and mech room is the corridor, and guard C walks it.
+// These two ducts skip it — but you can only get in crouched.
+const VENTS=[
+  {x:12.6, y:3.4, z:-18.0, to:1, where:'the mechanical room'},
+  {x:19.4, y:0.0, z:8.2,  to:0, where:'the mezzanine deck'}
+];
+VENTS.forEach((v,i)=>{
+  const g=new THREE.Group(); g.position.set(v.x,v.y,v.z); scene.add(g);
+  const frame=new THREE.Mesh(new THREE.BoxGeometry(1.3,1.0,0.16),MAT.duct);
+  frame.position.y=0.62; g.add(frame);
+  const mouth=new THREE.Mesh(new THREE.BoxGeometry(1.0,0.72,0.06),MAT.dark);
+  mouth.position.set(0,0.62,0.1); g.add(mouth);
+  for(let k=0;k<4;k++){
+    const slat=new THREE.Mesh(new THREE.BoxGeometry(0.96,0.06,0.1),MAT.steel);
+    slat.position.set(0,0.36+k*0.16,0.13); g.add(slat);
+  }
+  const tag=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.16,0.03),MAT.cyan);
+  tag.position.set(0.5,1.02,0.1); g.add(tag);
+  v.mesh=mouth;
+  addInteract(mouth,{
+    name:'DUCT ACCESS',
+    hint:()=> 'Runs through to '+v.where+'.',
+    verb:'HOLD E — CRAWL',
+    hold:1.9,
+    locked:()=> state.crouch ? null : 'You are not fitting in there standing up. Crouch first.',
+    act(){
+      const d=VENTS[v.to];
+      P.x=d.x; P.z=d.z+(d.y>1?1.6:1.6); P.y=d.y; P.vx=0; P.vz=0;
+      yaw = d.y>1 ? 0 : Math.PI;
+      state.crouch=true;
+      logLine('Through the duct. You come out in '+d.where+'.','good');
+    }
+  });
+});
+
 // exit
 const exitDoor=new THREE.Mesh(new THREE.BoxGeometry(0.14,3.0,1.8),MAT.dark);
 exitDoor.position.set(13.7,1.5,15); scene.add(exitDoor);
@@ -528,7 +605,7 @@ addInteract(exitDoor,{
 
 // ───────── guards ─────────
 const guards=[];
-function buildGuard(path,speed,name){
+function buildGuard(path,speed,name,level){
   const g=new THREE.Group(); scene.add(g);
   const legs=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.9,0.3),MAT.guard); legs.position.y=0.45; g.add(legs);
   const torso=new THREE.Mesh(new THREE.BoxGeometry(0.58,0.8,0.36),MAT.guardVest); torso.position.y=1.28; g.add(torso);
@@ -542,9 +619,9 @@ function buildGuard(path,speed,name){
       side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
   cone.rotation.x=-Math.PI/2; cone.position.set(0,1.5,4.5); g.add(cone);
 
-  const gd={g,path,speed,name,wp:1,sus:0,down:false,pause:0,lamp,cone,head,torso,legs,cap,
-            face:0,searched:false};
-  g.position.set(path[0][0],0,path[0][1]);
+  const gd={g,path,speed,name,level:level||0,wp:1,sus:0,down:false,pause:0,lamp,cone,head,torso,legs,cap,
+            face:0,searched:false,mode:'patrol',invest:null,investT:0,alarmT:0};
+  g.position.set(path[0][0],gd.level,path[0][1]);
   guards.push(gd);
 
   const body=new THREE.Mesh(new THREE.BoxGeometry(0.7,1.9,0.5),new THREE.MeshBasicMaterial({visible:false}));
@@ -569,10 +646,10 @@ function buildGuard(path,speed,name){
         gd.searched=true; takeClue('badge');
       } else {
         gd.down=true; state.downed++;
-        gd.g.rotation.x=Math.PI/2.1; gd.g.position.y=0.25;
+        gd.g.rotation.x=Math.PI/2.1; gd.g.position.y=(gd.level||0)+0.25;
         gd.cone.visible=false; gd.lamp.material=MAT.dark;
         // drop the search volume where the body actually comes to rest
-        gd.loot.position.set(gd.g.position.x, 0.55, gd.g.position.z+1.0);
+        gd.loot.position.set(gd.g.position.x, (gd.level||0)+0.55, gd.g.position.z+1.0);
         logLine('Guard down. Press E on the body to search him.','good');
         setObjective();
       }
@@ -595,6 +672,7 @@ function buildGuard(path,speed,name){
 buildGuard([[-7.5,-14],[-7.5,12],[0,12],[0,-14]],1.5,'A');
 buildGuard([[12.5,12],[12.5,-14],[7.5,-14],[7.5,12]],1.7,'B');
 buildGuard([[16,1],[22,1],[30,-4],[30,7],[22,1]],1.4,'C');
+buildGuard([[11.9,-17],[11.9,7],[11.9,-17]],1.25,'D',3.4);
 
 // ───────── score: original, sequenced in Web Audio ─────────
 const MIX={master:0.5, music:0.34, musicMenu:0.20};
@@ -826,7 +904,7 @@ function tickCams(dt){
     if(dist<range){
       const f=new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0),c.g.rotation.y);
       const to=new THREE.Vector3(dx,0,dz).normalize();
-      if(f.dot(to)>0.88 && losClear(c.g.position.x,c.g.position.z,P.x,P.z)) sees=true;
+      if(f.dot(to)>0.88 && losClear(c.g.position.x,c.g.position.z,P.x,P.z,P.y)) sees=true;
     }
     if(sees){ c.sus=Math.min(100,c.sus+27*dt); seen=true; }
     else c.sus=Math.max(0,c.sus-13*dt);
@@ -843,7 +921,7 @@ function tickCams(dt){
 // ───────── state ─────────
 const state={playing:false,paused:false,camSees:false,camsDown:0,time:0,sus:0,peakSus:0,downed:0,dark:false,darkT:0,
   disc:false,hacked:false,hold:0,holdTarget:null,spotted:false,crouch:false};
-const P={x:11,z:15.5,vx:0,vz:0};
+const P={x:11,z:15.5,y:0,vx:0,vz:0};
 
 // ───────── HUD ─────────
 const H={
@@ -857,6 +935,12 @@ const H={
   progWrap:document.getElementById('progWrap'), progFill:document.getElementById('progFill'),
   progLabel:document.getElementById('progLabel'), vig:document.getElementById('vig')
 };
+const saidBy={};
+function say_g(gd,text,cls){
+  if(saidBy[gd.name]===text) return;
+  saidBy[gd.name]=text; logLine(text,cls);
+  setTimeout(()=>{ delete saidBy[gd.name]; },9000);
+}
 function logLine(text,cls){
   const d=document.createElement('div'); d.className='line'+(cls?' '+cls:''); d.textContent=text;
   H.log.appendChild(d);
@@ -1016,16 +1100,30 @@ renderer.domElement.addEventListener('click',()=>{
 });
 
 // ───────── movement + LOS ─────────
-function blocked(nx,nz){
-  for(const c of colliders)
-    if(Math.abs(nx-c.x)<c.hw+0.38 && Math.abs(nz-c.z)<c.hd+0.38) return true;
+function blocked(nx,nz,y){
+  y = y||0;
+  for(const c of colliders){
+    if(Math.abs(nx-c.x)>=c.hw+0.38 || Math.abs(nz-c.z)>=c.hd+0.38) continue;
+    if(c.top!==undefined && c.top < y+0.3) continue;      // you are standing above it
+    if(c.floor!==undefined && c.floor > y+1.8) continue;  // it is above your head
+    return true;
+  }
   return false;
 }
-function losClear(ax,az,bx,bz){
+// walkable height under a point: 0 on the slab, DECK.y on the mezzanine, ramped on the stair
+function groundAt(x,z,curY){
+  let g=0;
+  if(inStair(x,z)) g=stairY(z);
+  for(const p of platforms){
+    if(Math.abs(x-p.x)<p.hw && Math.abs(z-p.z)<p.hd && p.y>g && p.y<=curY+0.75) g=p.y;
+  }
+  return g;
+}
+function losClear(ax,az,bx,bz,y){
   const dx=bx-ax, dz=bz-az, d=Math.hypot(dx,dz), steps=Math.ceil(d/0.7);
   for(let i=1;i<steps;i++){
     const t=i/steps;
-    if(blocked(ax+dx*t, az+dz*t)) return false;
+    if(blocked(ax+dx*t, az+dz*t, y||0)) return false;
   }
   return true;
 }
@@ -1043,11 +1141,15 @@ function move(dt){
   P.vx+=(wx*spd-P.vx)*Math.min(1,dt*12);
   P.vz+=(wz*spd-P.vz)*Math.min(1,dt*12);
   const nx=P.x+P.vx*dt, nz=P.z+P.vz*dt;
-  if(!blocked(nx,P.z)) P.x=nx; else P.vx=0;
-  if(!blocked(P.x,nz)) P.z=nz; else P.vz=0;
+  if(!blocked(nx,P.z,P.y)) P.x=nx; else P.vx=0;
+  if(!blocked(P.x,nz,P.y)) P.z=nz; else P.vz=0;
+  // settle onto whatever deck or tread is underfoot
+  const gy=groundAt(P.x,P.z,P.y);
+  P.y += (gy-P.y)*Math.min(1,dt*(gy>P.y?9:14));
+  if(Math.abs(gy-P.y)<0.02) P.y=gy;
   const moving=Math.hypot(P.vx,P.vz);
   const bob=Math.sin(performance.now()*0.012)*Math.min(0.05,moving*0.014);
-  camera.position.set(P.x,(state.crouch?1.05:1.65)+bob,P.z);
+  camera.position.set(P.x,P.y+(state.crouch?1.05:1.65)+bob,P.z);
   camera.rotation.set(pitch,yaw,0);
   return {running,moving};
 }
@@ -1060,12 +1162,15 @@ function tickGuards(dt,running,moving){
     // patrol
     if(gd.pause>0){ gd.pause-=dt; }
     else {
-      const tgt=gd.path[gd.wp];
+      const tgt=gd.mode==='investigate'&&gd.invest ? [gd.invest.x,gd.invest.z] : gd.path[gd.wp];
       const dx=tgt[0]-gd.g.position.x, dz=tgt[1]-gd.g.position.z;
       const d=Math.hypot(dx,dz);
-      if(d<0.35){ gd.wp=(gd.wp+1)%gd.path.length; gd.pause=0.6+Math.random()*1.4; }
+      if(d<0.35){
+        if(gd.mode==='investigate'){ gd.investT+=0.0001; }
+        else { gd.wp=(gd.wp+1)%gd.path.length; gd.pause=0.6+Math.random()*1.4; }
+      }
       else {
-        const sp=gd.speed*(gd.sus>35?1.5:1);
+        const sp=gd.speed*(gd.mode==='investigate'?1.75:(gd.sus>35?1.35:1));
         gd.g.position.x+=dx/d*sp*dt; gd.g.position.z+=dz/d*sp*dt;
         gd.face=Math.atan2(dx,dz);
       }
@@ -1085,10 +1190,11 @@ function tickGuards(dt,running,moving){
     if(dist<range){
       const f=new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0),gd.g.rotation.y);
       const to=new THREE.Vector3(dx,0,dz).normalize();
-      if(f.dot(to)>0.78 && losClear(gd.g.position.x,gd.g.position.z,P.x,P.z)) sees=true;
+      const sameLevel = Math.abs((gd.level||0)-P.y) < 1.6;
+      if(sameLevel && f.dot(to)>0.78 && losClear(gd.g.position.x,gd.g.position.z,P.x,P.z,gd.level||0)) sees=true;
     }
     // noise: running is heard through racks
-    const heard = running && dist<8.5;
+    const heard = running && dist<8.5 && Math.abs((gd.level||0)-P.y)<2.2;
     if(sees||heard){
       anySees=anySees||sees;
       const rate = (sees? (state.crouch?16:30)*(1-dist/range*0.5) : 10);
@@ -1096,13 +1202,41 @@ function tickGuards(dt,running,moving){
     } else {
       gd.sus=Math.max(0,gd.sus-11*dt);
     }
-    // a downed colleague in view is its own problem
+    // remember where you were when he loses you
+    if(sees){ gd.lastSeen={x:P.x,z:P.z}; }
+    else if(gd.mode==='patrol' && gd.sus>42 && gd.lastSeen){
+      gd.mode='investigate'; gd.invest=gd.lastSeen; gd.investT=0; gd.probe=true;
+      say_g(gd,'A guard is walking to where he last saw you.','warn');
+    }
+
+    // a downed colleague is not a mood — he goes and looks
     guards.forEach(o=>{
-      if(!o.down || o===gd) return;
+      if(!o.down || o===gd || o.found) return;
       const bx=o.g.position.x-gd.g.position.x, bz=o.g.position.z-gd.g.position.z;
-      if(Math.hypot(bx,bz)<6 && losClear(gd.g.position.x,gd.g.position.z,o.g.position.x,o.g.position.z))
-        gd.sus=Math.min(100,gd.sus+16*dt);
+      if(Math.hypot(bx,bz)<9 && Math.abs((o.level||0)-(gd.level||0))<1.6 &&
+         losClear(gd.g.position.x,gd.g.position.z,o.g.position.x,o.g.position.z,gd.level||0)){
+        o.found=true;
+        gd.mode='investigate'; gd.probe=false;
+        gd.invest={x:o.g.position.x, z:o.g.position.z};
+        gd.investT=0;
+        gd.sus=Math.max(gd.sus,55);
+        say_g(gd,'He has seen a body. Put him down or you have about six seconds.','bad');
+        blip(150,0.4,'sawtooth',0.18);
+      }
     });
+
+    // standing over what he came to look at
+    if(gd.mode==='investigate' && gd.invest){
+      const ix=gd.invest.x-gd.g.position.x, iz=gd.invest.z-gd.g.position.z;
+      if(Math.hypot(ix,iz)<1.6){
+        gd.investT+=dt;
+        gd.sus=Math.min(gd.probe?70:99, gd.sus + (gd.probe?4:14)*dt);
+        if(!gd.probe && gd.investT>6){ finish(false,'body'); }
+        if(gd.probe && gd.investT>3.5){
+          gd.mode='patrol'; gd.invest=null; gd.investT=0; gd.lastSeen=null;
+        }
+      }
+    }
 
     loudest=Math.max(loudest,gd.sus);
     const c = gd.sus>62?0xff2418 : gd.sus>25?0xffb020 : 0x4dff9e;
@@ -1203,7 +1337,9 @@ function start(){
   ambient.intensity=0.75; overhead.intensity=0.34;
   guards.forEach(gd=>{
     gd.down=false; gd.searched=false; gd.sus=0; gd.wp=1; gd.pause=0;
-    gd.g.rotation.set(0,0,0); gd.g.position.set(gd.path[0][0],0,gd.path[0][1]);
+    gd.g.rotation.set(0,0,0); gd.g.position.set(gd.path[0][0],gd.level||0,gd.path[0][1]);
+    gd.mode='patrol'; gd.invest=null; gd.investT=0; gd.alarmT=0;
+    gd.found=false; gd.probe=false; gd.lastSeen=null;
     gd.cone.visible=true; gd.lamp.material=new THREE.MeshBasicMaterial({color:0x4dff9e});
     gd.loot.position.set(0,-100,0);
   });
@@ -1217,6 +1353,7 @@ function start(){
   setObjective(); paintHUD();
   logLine('Inside. Three on the floor, three cameras on the ceiling.','warn');
   logLine('The cameras all record back to one box in the hall. Find it.');
+  logLine('There is a deck above the east racks, and ducts that skip the corridor.');
   document.body.requestPointerLock();
 }
 function finish(won,why){
@@ -1227,12 +1364,15 @@ function finish(won,why){
   document.getElementById('eTime').textContent=m+':'+String(s).padStart(2,'0');
   document.getElementById('eDown').textContent=state.downed;
   document.getElementById('ePeak').textContent=Math.round(state.peakSus)+'%';
-  document.getElementById('endTitle').textContent = won?(state.downed===0?'GHOST':'OUT CLEAN'):'MADE';
+  document.getElementById('endTitle').textContent = won?(state.downed===0?'GHOST':'OUT CLEAN')
+    : why==='body' ? 'BODY FOUND' : 'MADE';
   document.getElementById('endWhy').textContent = won
     ? (state.downed===0
         ? 'Nobody was touched and nobody knows you were here. That is the best version of this.'
         : state.downed+' guard'+(state.downed===1?'':'s')+' will wake up on the floor with a story. You still got out with the files.')
-    : 'A guard filled his meter and called it. Crouching cuts how fast they read you, racks break line of sight, and the lighting panel in the mechanical room buys you about twenty-five seconds of near-blindness.';
+    : why==='body'
+      ? 'A guard stood over one of your bodies long enough to call it in. Drop them out of the patrol lines — behind the racks, up on the deck, anywhere a route does not pass.'
+      : 'A guard filled his meter and called it. Crouching cuts how fast they read you, racks break line of sight, and the lighting panel in the mechanical room buys you about twenty-five seconds of near-blindness.';
   endS.classList.remove('hidden');
 }
 document.getElementById('startBtn').onclick=start;
