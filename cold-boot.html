@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>COLD BOOT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,500;0,600;0,700;1,700&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#04070c;--cyan:#5fe6ff;--green:#4dff9e;--amber:#ffb020;--red:#ff2418;
+        --violet:#b026ff;--steel:#8f9ab8;--line:rgba(95,230,255,.22)}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{background:var(--ink);color:#dfe7f5;font-family:'Chakra Petch',system-ui,sans-serif;
+    -webkit-user-select:none;user-select:none;overflow:hidden;
+    background-image:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(95,230,255,.07),transparent 70%),
+                     radial-gradient(ellipse 70% 50% at 50% 110%,rgba(176,38,255,.07),transparent 70%)}
+  /* scanlines */
+  body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:99;opacity:.35;
+    background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.35) 2px 3px)}
+
+  #shell{height:100%;display:flex;flex-direction:column;max-width:760px;margin:0 auto;padding:14px}
+
+  header{display:flex;justify-content:space-between;align-items:center;
+    border-bottom:1px solid var(--line);padding-bottom:10px;flex-shrink:0}
+  .brand{font-size:13px;font-weight:700;font-style:italic;letter-spacing:2px;color:#fff}
+  .brand i{font-style:normal;color:var(--cyan)}
+  .hstats{display:flex;gap:16px;align-items:center}
+  .hs{text-align:right}
+  .hs b{display:block;font-size:16px;font-weight:700;font-style:italic;color:#fff;line-height:1;
+    font-variant-numeric:tabular-nums}
+  .hs span{font-size:9px;font-weight:700;letter-spacing:1.6px;color:var(--steel)}
+  #mute{font-family:inherit;font-size:10px;font-weight:700;letter-spacing:1.4px;color:var(--steel);
+    background:transparent;border:1px solid rgba(255,255,255,.16);padding:6px 10px;cursor:pointer}
+  #mute.on{color:var(--cyan);border-color:var(--line)}
+
+  #trace{flex-shrink:0;margin-top:10px}
+  .tTop{display:flex;justify-content:space-between;font-size:10px;font-weight:700;letter-spacing:1.6px;
+    color:var(--steel);margin-bottom:4px}
+  .tTop b{color:var(--amber)}
+  .barOuter{height:6px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+    position:relative;overflow:hidden}
+  #traceFill{position:absolute;inset:0;transform-origin:left center;transform:scaleX(0);
+    background:linear-gradient(90deg,#4dff9e,#ffb020 55%,#ff2418);transition:transform .18s}
+
+  main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:16px;padding:14px 0;min-height:0;overflow:hidden}
+
+  .kick{font-size:10px;font-weight:700;letter-spacing:3px;color:var(--steel);text-align:center}
+  h1{font-size:clamp(38px,11vw,76px);font-weight:700;font-style:italic;letter-spacing:-2.5px;
+    line-height:.88;color:#fff;text-align:center}
+  .blurb{font-size:14px;font-weight:500;color:var(--steel);max-width:52ch;text-align:center;line-height:1.6}
+  .blurb em{color:#dfe7f5;font-style:normal}
+
+  .jobs{display:grid;gap:9px;width:100%;max-width:520px}
+  .job{display:flex;justify-content:space-between;align-items:center;gap:12px;
+    border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.02);
+    padding:12px 15px;cursor:pointer;transition:border-color .12s,background .12s;text-align:left}
+  .job:hover{border-color:var(--line);background:rgba(95,230,255,.05)}
+  .job.done{opacity:.42;pointer-events:none}
+  .job b{display:block;font-size:15px;font-weight:700;color:#fff}
+  .job span{display:block;font-size:11.5px;font-weight:500;color:var(--steel);margin-top:2px}
+  .job .pay{font-size:15px;font-weight:700;font-style:italic;color:var(--green);white-space:nowrap}
+  .job.done .pay{color:var(--steel)}
+
+  .stage{font-size:10px;font-weight:700;letter-spacing:2.4px;color:var(--cyan);text-align:center}
+  .title2{font-size:22px;font-weight:700;font-style:italic;color:#fff;text-align:center;line-height:1.1}
+  .hint{font-size:12.5px;font-weight:500;color:var(--steel);text-align:center;max-width:44ch;line-height:1.5}
+
+  .clock{width:100%;max-width:460px;height:5px;background:rgba(255,255,255,.06);position:relative;overflow:hidden}
+  #clockFill{position:absolute;inset:0;background:var(--cyan);transform-origin:left center}
+  #clockFill.low{background:var(--red)}
+
+  /* shared game bits */
+  .grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+  .grid6{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+  .cell{aspect-ratio:1;min-width:44px;border:1px solid rgba(255,255,255,.13);
+    background:rgba(255,255,255,.03);cursor:pointer;transition:background .09s,border-color .09s;
+    display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:#8fa0bd}
+  .cell:hover{border-color:var(--line)}
+  .cell.lit{background:rgba(95,230,255,.8);border-color:var(--cyan);box-shadow:0 0 16px rgba(95,230,255,.55)}
+  .cell.ok{background:rgba(77,255,158,.45);border-color:var(--green);color:#04180e}
+  .cell.no{background:rgba(255,36,24,.5);border-color:var(--red)}
+  .cell.on{background:rgba(77,255,158,.35);border-color:var(--green)}
+  .cell.wall{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.06);cursor:default}
+  .cell.path{background:rgba(95,230,255,.45);border-color:var(--cyan)}
+  .cell.start{background:rgba(255,176,32,.4);border-color:var(--amber)}
+  .cell.end{background:rgba(176,38,255,.4);border-color:var(--violet)}
+
+  .dials{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  .dial{width:60px;height:70px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.03);
+    font-family:inherit;font-size:28px;font-weight:700;color:#dfe7f5;cursor:pointer}
+  .dial.set{color:var(--green);border-color:rgba(77,255,158,.5)}
+  .target{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  .tg{width:60px;text-align:center;font-size:22px;font-weight:700;color:var(--amber)}
+
+  .track{position:relative;width:min(440px,90vw);height:34px;border:1px solid rgba(255,255,255,.16);
+    background:rgba(255,255,255,.03);overflow:hidden}
+  #win{position:absolute;top:0;bottom:0;background:rgba(77,255,158,.26);
+    border-left:1px solid var(--green);border-right:1px solid var(--green)}
+  #mark{position:absolute;top:0;bottom:0;width:4px;background:#fff;box-shadow:0 0 12px #fff}
+
+  .codes{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:7px;width:100%;max-width:480px}
+  .code{border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.03);padding:10px 6px;
+    font-size:14px;font-weight:700;letter-spacing:1.4px;color:#a9b8d4;cursor:pointer;text-align:center}
+  .code:hover{border-color:var(--line);color:#fff}
+  .code.no{background:rgba(255,36,24,.4);border-color:var(--red)}
+  .code.ok{background:rgba(77,255,158,.4);border-color:var(--green)}
+
+  .pips{display:flex;gap:6px}
+  .pip{width:22px;height:6px;background:rgba(255,255,255,.13)}
+  .pip.on{background:var(--green);box-shadow:0 0 8px rgba(77,255,158,.5)}
+
+  button.go{font-family:inherit;font-size:16px;font-weight:700;font-style:italic;letter-spacing:.5px;
+    color:#02141a;background:var(--cyan);border:0;padding:13px 34px;cursor:pointer;
+    clip-path:polygon(0 0,100% 0,calc(100% - 12px) 100%,0 100%);box-shadow:0 0 28px rgba(95,230,255,.35)}
+  button.go:hover{box-shadow:0 0 42px rgba(95,230,255,.6)}
+  button.ghost{font-family:inherit;font-size:13px;font-weight:600;color:#c2cde1;background:transparent;
+    border:1px solid rgba(255,255,255,.2);padding:11px 20px;cursor:pointer}
+  button.ghost:hover{border-color:rgba(255,255,255,.45);color:#fff}
+  .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
+
+  #msg{font-size:12.5px;font-weight:600;color:var(--steel);text-align:center;min-height:18px}
+  #msg.bad{color:var(--red)} #msg.good{color:var(--green)} #msg.warn{color:var(--amber)}
+
+  footer{flex-shrink:0;border-top:1px solid rgba(255,255,255,.08);padding-top:9px;
+    display:flex;justify-content:space-between;font-size:10.5px;font-weight:600;color:#3f4a63}
+  footer a{color:#5a6a86;text-decoration:none}
+  footer a:hover{color:var(--cyan)}
+  @media(max-width:520px){ .cell{min-width:0} .dial{width:52px;height:62px;font-size:23px} .tg{width:52px} }
+</style>
+</head>
+<body>
+<div id="shell">
+  <header>
+    <div class="brand">COLD <i>BOOT</i></div>
+    <div class="hstats">
+      <div class="hs"><b id="hScore">0</b><span>SESSION</span></div>
+      <div class="hs"><b id="hBest">0</b><span>BEST</span></div>
+      <button id="mute">SOUND OFF</button>
+    </div>
+  </header>
+
+  <div id="trace" style="visibility:hidden">
+    <div class="tTop"><span>TRACE</span><b id="traceVal">0%</b></div>
+    <div class="barOuter"><div id="traceFill"></div></div>
+  </div>
+
+  <main id="main"></main>
+
+  <footer>
+    <span id="fLeft">READY</span>
+    <a href="index.html">← back to the night</a>
+  </footer>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ═══════════ audio ═══════════
+let AC=null, master=null, on=false, hum=null, humGain=null;
+function initAudio(){
+  if(AC) return;
+  AC=new (window.AudioContext||window.webkitAudioContext)();
+  master=AC.createGain(); master.gain.value=0.42; master.connect(AC.destination);
+  humGain=AC.createGain(); humGain.gain.value=0;
+  const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=240;
+  hum=AC.createOscillator(); hum.type='sawtooth'; hum.frequency.value=46;
+  const h2=AC.createOscillator(); h2.type='sine'; h2.frequency.value=69;
+  hum.connect(f); h2.connect(f); f.connect(humGain); humGain.connect(master);
+  hum.start(); h2.start();
+}
+function beep(fr,dur,type,vol){
+  if(!AC||!on) return;
+  const o=AC.createOscillator(), g=AC.createGain();
+  o.type=type||'square'; o.frequency.value=fr;
+  g.gain.setValueAtTime(vol||0.12,AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0007,AC.currentTime+(dur||0.08));
+  o.connect(g); g.connect(master); o.start(); o.stop(AC.currentTime+(dur||0.08)+0.02);
+}
+function sweep(a,b,dur,vol){
+  if(!AC||!on) return;
+  const o=AC.createOscillator(), g=AC.createGain();
+  o.type='sawtooth'; o.frequency.setValueAtTime(a,AC.currentTime);
+  o.frequency.exponentialRampToValueAtTime(b,AC.currentTime+dur);
+  g.gain.setValueAtTime(vol||0.16,AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+dur);
+  o.connect(g); g.connect(master); o.start(); o.stop(AC.currentTime+dur+0.02);
+}
+const muteBtn=document.getElementById('mute');
+muteBtn.onclick=()=>{
+  on=!on; initAudio(); if(AC.state==='suspended') AC.resume();
+  muteBtn.classList.toggle('on',on);
+  muteBtn.textContent = on?'SOUND ON':'SOUND OFF';
+};
+
+// ═══════════ state ═══════════
+const S={ score:0, best:0, trace:0, contract:null, layer:0, clock:0, running:false, done:[] };
+const main=document.getElementById('main');
+const msgEl=()=>document.getElementById('msg');
+const el=id=>document.getElementById(id);
+
+function say(t,cls){ const m=msgEl(); if(m){ m.textContent=t; m.className=cls||''; } }
+function paintHead(){
+  el('hScore').textContent=S.score.toLocaleString();
+  el('hBest').textContent=S.best.toLocaleString();
+  el('traceVal').textContent=Math.round(S.trace)+'%';
+  el('traceFill').style.transform='scaleX('+Math.min(1,S.trace/100)+')';
+  if(humGain) humGain.gain.value = on&&S.running ? 0.012+S.trace/100*0.05 : 0;
+}
+function addTrace(n,text){
+  S.trace=Math.min(100,S.trace+n);
+  paintHead();
+  say(text||'That got logged.','bad');
+  beep(150,0.14,'square',0.11);
+  if(S.trace>=100) burned();
+}
+
+// ═══════════ contracts ═══════════
+const JOBS=[
+  {id:'kiosk', name:'PARKING KIOSK',   who:'Warm-up. One payment terminal, no monitoring worth the name.',
+   layers:3, diff:1, time:26, pay:400},
+  {id:'switch',name:'PHONE SWITCH',    who:'A trunk controller in a comms closet. Old kit, patient logging.',
+   layers:4, diff:2, time:24, pay:900},
+  {id:'soc',   name:'SECURITY CENTRE', who:'Camera store and door logs. Somebody is watching the watchers.',
+   layers:4, diff:3, time:22, pay:1600},
+  {id:'reg',   name:'RECORDS ANNEXE',  who:'Federal file store. Slow network, very awake auditors.',
+   layers:5, diff:4, time:21, pay:2600},
+  {id:'clear', name:'THE CLEARING BANK',who:'End of the night. Everything they have, behind everything they have.',
+   layers:6, diff:5, time:19, pay:4200}
+];
+
+// ═══════════ mini-games ═══════════
+// Each: start(host, diff, api) with api = {ok, fail, say}
+const GLYPHS=['\u25B2','\u25A0','\u25CF','\u2726','\u25C6','\u2B22','\u25D0','\u2749'];
+const HEX='0123456789ABCDEF';
+const rnd=n=>Math.floor(Math.random()*n);
+const pick=a=>a[rnd(a.length)];
+
+const GAMES=[
+{
+  key:'TRACE', title:'Retrace the route',
+  hint:'A path flashes across the switch. Tap the same nodes back, in the same order.',
+  start(host,diff,api){
+    const len=Math.min(8,3+diff);
+    const g=document.createElement('div'); g.className='grid5'; host.appendChild(g);
+    const cells=[]; for(let i=0;i<25;i++){ const c=document.createElement('div'); c.className='cell'; g.appendChild(c); cells.push(c); }
+    const path=[]; while(path.length<len){ const n=rnd(25); if(!path.includes(n)) path.push(n); }
+    let step=0, armed=false;
+    path.forEach((n,k)=>{
+      setTimeout(()=>{ cells[n].classList.add('lit'); beep(480+k*70,0.08,'square',0.08); },300+k*380);
+      setTimeout(()=>{ cells[n].classList.remove('lit'); },300+k*380+290);
+    });
+    setTimeout(()=>{ armed=true; api.say('Your turn.'); },300+len*380+120);
+    cells.forEach((c,i)=>c.onclick=()=>{
+      if(!armed) return;
+      if(i===path[step]){ c.classList.add('ok'); beep(700+step*55,0.06,'square',0.09); step++;
+        if(step>=path.length) api.ok(); }
+      else { c.classList.add('no'); setTimeout(()=>c.classList.remove('no'),240);
+        step=0; cells.forEach(x=>x.classList.remove('ok'));
+        api.fail(7,'Wrong node. Route reset.'); }
+    });
+  }
+},
+{
+  key:'CYCLE', title:'Match the header',
+  hint:'Tap each field until it matches the glyph above it. Only the clock punishes you here.',
+  start(host,diff,api){
+    const n=Math.min(6,2+diff), pool=GLYPHS.slice(0,Math.min(GLYPHS.length,4+diff));
+    const tgt=document.createElement('div'); tgt.className='target';
+    const row=document.createElement('div'); row.className='dials';
+    const want=[],cur=[];
+    for(let i=0;i<n;i++){
+      want.push(rnd(pool.length));
+      cur.push((want[i]+1+rnd(pool.length-1))%pool.length);
+      const t=document.createElement('div'); t.className='tg'; t.textContent=pool[want[i]]; tgt.appendChild(t);
+    }
+    for(let i=0;i<n;i++){
+      const b=document.createElement('button'); b.className='dial'; b.textContent=pool[cur[i]];
+      b.onclick=()=>{ cur[i]=(cur[i]+1)%pool.length; b.textContent=pool[cur[i]];
+        b.classList.toggle('set',cur[i]===want[i]); beep(400+i*60,0.045,'square',0.06);
+        if(cur.every((v,k)=>v===want[k])) api.ok(); };
+      if(cur[i]===want[i]) b.classList.add('set');
+      row.appendChild(b);
+    }
+    host.appendChild(tgt); host.appendChild(row);
+  }
+},
+{
+  key:'LOCK', title:'Catch the carrier',
+  hint:'Tap LOCK while the marker is inside the window. Each hit narrows it.',
+  start(host,diff,api){
+    const need=Math.min(5,2+Math.ceil(diff/2));
+    const track=document.createElement('div'); track.className='track';
+    const win=document.createElement('div'); win.id='win';
+    const mark=document.createElement('div'); mark.id='mark';
+    track.appendChild(win); track.appendChild(mark);
+    const pips=document.createElement('div'); pips.className='pips';
+    const pe=[]; for(let i=0;i<need;i++){ const p=document.createElement('div'); p.className='pip'; pips.appendChild(p); pe.push(p); }
+    const btn=document.createElement('button'); btn.className='go'; btn.textContent='LOCK';
+    host.appendChild(track); host.appendChild(pips); host.appendChild(btn);
+    let hits=0, w=Math.max(14,30-diff*3), wp=rnd(60)+6, pos=0, dir=1, spd=48+diff*10;
+    const place=()=>{ win.style.left=wp+'%'; win.style.width=w+'%'; };
+    place();
+    const iv=setInterval(()=>{
+      pos+=dir*spd*0.03; if(pos>100){pos=100;dir=-1;} if(pos<0){pos=0;dir=1;}
+      mark.style.left=pos+'%';
+    },30);
+    api.onEnd=()=>clearInterval(iv);
+    btn.onclick=()=>{
+      if(pos>=wp&&pos<=wp+w){
+        hits++; pe[hits-1].classList.add('on'); beep(660+hits*130,0.09,'triangle',0.12);
+        if(hits>=need){ clearInterval(iv); api.ok(); return; }
+        w=Math.max(9,w-5); wp=rnd(Math.max(1,96-w)); spd+=14; place(); api.say('Locked. Tighter.','good');
+      } else api.fail(6,'Missed. Carrier spiked.');
+    };
+  }
+},
+{
+  key:'PATCH', title:'All green',
+  hint:'Tapping a port flips it and the four around it. Get every port lit.',
+  start(host,diff,api){
+    const n=4, g=document.createElement('div'); g.className='grid4'; host.appendChild(g);
+    const st=new Array(n*n).fill(true), cells=[];
+    for(let i=0;i<n*n;i++){ const c=document.createElement('div'); c.className='cell on'; g.appendChild(c); cells.push(c); }
+    const flip=i=>{
+      const r=Math.floor(i/n), c=i%n;
+      [[0,0],[1,0],[-1,0],[0,1],[0,-1]].forEach(([dr,dc])=>{
+        const nr=r+dr, nc=c+dc;
+        if(nr<0||nr>=n||nc<0||nc>=n) return;
+        const k=nr*n+nc; st[k]=!st[k]; cells[k].classList.toggle('on',st[k]);
+      });
+    };
+    const scrambles=2+diff;
+    for(let i=0;i<scrambles;i++) flip(rnd(n*n));
+    if(st.every(v=>v)) flip(rnd(n*n));
+    cells.forEach((c,i)=>c.onclick=()=>{
+      flip(i); beep(380+rnd(200),0.05,'square',0.07);
+      if(st.every(v=>v)) api.ok();
+    });
+  }
+},
+{
+  key:'SIEVE', title:'Find the odd key',
+  hint:'Every key on this list is identical but one. Tap the one that is different.',
+  start(host,diff,api){
+    const count=Math.min(18,6+diff*3), len=4+Math.min(4,diff);
+    let base=''; for(let i=0;i<len;i++) base+=HEX[rnd(16)];
+    let odd=base.split('');
+    const at=rnd(len);
+    let ch; do{ ch=HEX[rnd(16)]; }while(ch===odd[at]);
+    odd[at]=ch; odd=odd.join('');
+    const oddIdx=rnd(count);
+    const wrap=document.createElement('div'); wrap.className='codes'; host.appendChild(wrap);
+    for(let i=0;i<count;i++){
+      const d=document.createElement('div'); d.className='code';
+      d.textContent = i===oddIdx?odd:base;
+      d.onclick=()=>{
+        if(i===oddIdx){ d.classList.add('ok'); beep(820,0.1,'triangle',0.12); api.ok(); }
+        else { d.classList.add('no'); setTimeout(()=>d.classList.remove('no'),240);
+          api.fail(8,'That one matched. Keep looking.'); }
+      };
+      wrap.appendChild(d);
+    }
+  }
+},
+{
+  key:'ROUTE', title:'Walk it out',
+  hint:'Tap from the amber tile to the violet one, one step at a time. No diagonals, no shaded tiles.',
+  start(host,diff,api){
+    const n=6, g=document.createElement('div'); g.className='grid6'; host.appendChild(g);
+    const walls=new Set();
+    // carve a guaranteed route first, then shade some of what is left
+    const route=[0]; let r=0,c=0;
+    while(r<n-1||c<n-1){
+      if(r===n-1) c++; else if(c===n-1) r++; else if(Math.random()<0.5) c++; else r++;
+      route.push(r*n+c);
+    }
+    const budget=4+diff*2;
+    let placed=0, guard=0;
+    while(placed<budget && guard++<300){
+      const k=rnd(n*n);
+      if(route.includes(k)||walls.has(k)) continue;
+      walls.add(k); placed++;
+    }
+    const cells=[];
+    for(let i=0;i<n*n;i++){
+      const d=document.createElement('div'); d.className='cell';
+      if(walls.has(i)) d.className+=' wall';
+      if(i===0) d.className+=' start';
+      if(i===n*n-1) d.className+=' end';
+      g.appendChild(d); cells.push(d);
+    }
+    let cur=0; const taken=[0];
+    cells[0].classList.add('path');
+    cells.forEach((d,i)=>d.onclick=()=>{
+      if(walls.has(i)) return;
+      const ar=Math.floor(cur/n), ac=cur%n, br=Math.floor(i/n), bc=i%n;
+      if(Math.abs(ar-br)+Math.abs(ac-bc)!==1){ api.fail(5,'Not adjacent.'); return; }
+      if(taken.includes(i)){ api.fail(4,'Already been there.'); return; }
+      cur=i; taken.push(i); d.classList.add('path'); beep(500+taken.length*25,0.05,'square',0.07);
+      if(i===n*n-1) api.ok();
+    });
+  }
+}
+];
+
+// ═══════════ screens ═══════════
+function menu(){
+  S.running=false; S.trace=0; el('trace').style.visibility='hidden'; paintHead();
+  el('fLeft').textContent='READY';
+  main.innerHTML='';
+  const k=document.createElement('div'); k.className='kick'; k.textContent='NIGHT HAWK — THE DESK';
+  const h=document.createElement('h1'); h.textContent='COLD BOOT';
+  const b=document.createElement('p'); b.className='blurb';
+  b.innerHTML='Six ways into a machine and a trace that never quite stops climbing. '+
+    'Pick a job, clear every layer before the session times out, and get out before they finish walking it back. '+
+    '<em>Fumbles raise the trace. The trace does not reset between layers.</em>';
+  main.appendChild(k); main.appendChild(h); main.appendChild(b);
+
+  const jobs=document.createElement('div'); jobs.className='jobs';
+  JOBS.forEach(j=>{
+    const d=document.createElement('div'); d.className='job'+(S.done.includes(j.id)?' done':'');
+    d.innerHTML='<div><b>'+j.name+'</b><span>'+j.layers+' layers · '+j.time+'s each · '+j.who+'</span></div>'+
+                '<div class="pay">'+(S.done.includes(j.id)?'DONE':'+'+j.pay.toLocaleString())+'</div>';
+    d.onclick=()=>startJob(j);
+    jobs.appendChild(d);
+  });
+  main.appendChild(jobs);
+
+  const m=document.createElement('div'); m.id='msg'; main.appendChild(m);
+  const row=document.createElement('div'); row.className='row';
+  const deep=document.createElement('button'); deep.className='ghost';
+  deep.textContent='DEEP RUN — endless, no payout ceiling';
+  deep.onclick=()=>startJob({id:'deep',name:'DEEP RUN',layers:999,diff:1,time:24,pay:0,deep:true});
+  row.appendChild(deep);
+  if(S.done.length){
+    const reset=document.createElement('button'); reset.className='ghost';
+    reset.textContent='Clear the board'; reset.onclick=()=>{ S.done=[]; menu(); };
+    row.appendChild(reset);
+  }
+  main.appendChild(row);
+}
+
+let tickIv=null;
+function startJob(job){
+  initAudio(); if(AC&&AC.state==='suspended') AC.resume();
+  S.contract=job; S.layer=0; S.trace=0; S.running=true;
+  el('trace').style.visibility='visible';
+  paintHead();
+  nextLayer();
+}
+
+let currentApi=null;
+function nextLayer(){
+  const job=S.contract;
+  S.layer++;
+  if(!job.deep && S.layer>job.layers){ jobDone(); return; }
+  const diff = job.deep ? Math.min(5,1+Math.floor((S.layer-1)/2)) : job.diff;
+  const time = job.deep ? Math.max(13,job.time-Math.floor((S.layer-1)*0.8)) : job.time;
+  const game = GAMES[rnd(GAMES.length)];
+
+  main.innerHTML='';
+  const st=document.createElement('div'); st.className='stage';
+  st.textContent = job.name+'  ·  LAYER '+S.layer+(job.deep?'':' / '+job.layers)+'  ·  '+game.key;
+  const t2=document.createElement('div'); t2.className='title2'; t2.textContent=game.title;
+  const hi=document.createElement('div'); hi.className='hint'; hi.textContent=game.hint;
+  const host=document.createElement('div'); host.className='row';
+  host.style.flexDirection='column';
+  const clock=document.createElement('div'); clock.className='clock';
+  const cf=document.createElement('div'); cf.id='clockFill'; clock.appendChild(cf);
+  const m=document.createElement('div'); m.id='msg';
+  const row=document.createElement('div'); row.className='row';
+  const bail=document.createElement('button'); bail.className='ghost'; bail.textContent='ABORT';
+  bail.onclick=()=>{ endLayerTimer(); if(currentApi&&currentApi.onEnd) currentApi.onEnd();
+    say('Session dropped.'); setTimeout(menu,500); };
+  row.appendChild(bail);
+
+  main.appendChild(st); main.appendChild(t2); main.appendChild(hi);
+  main.appendChild(host); main.appendChild(clock); main.appendChild(m); main.appendChild(row);
+  el('fLeft').textContent=job.name+' · layer '+S.layer;
+
+  let left=time, total=time, finished=false;
+  const api={
+    say,
+    fail(n,txt){ if(finished) return; addTrace(n,txt); },
+    ok(){
+      if(finished) return; finished=true;
+      endLayerTimer(); if(api.onEnd) api.onEnd();
+      const gain = Math.round((job.deep?260:job.pay/job.layers) * (1+left/total));
+      S.score+=gain; if(S.score>S.best) S.best=S.score;
+      paintHead();
+      say('Layer down. +'+gain.toLocaleString(),'good');
+      beep(700,0.1,'triangle',0.13); setTimeout(()=>beep(1040,0.14,'triangle',0.11),100);
+      setTimeout(nextLayer,620);
+    }
+  };
+  currentApi=api;
+  game.start(host,diff,api);
+
+  endLayerTimer();
+  tickIv=setInterval(()=>{
+    left-=0.1;
+    cf.style.transform='scaleX('+Math.max(0,left/total)+')';
+    cf.classList.toggle('low',left<total*0.25);
+    if(left<=0){
+      endLayerTimer(); finished=true;
+      if(api.onEnd) api.onEnd();
+      addTrace(26,'Session timed out. They got a good look.');
+      if(S.trace<100){ say('Timed out. Next layer, faster.','warn'); setTimeout(nextLayer,900); }
+    }
+  },100);
+}
+function endLayerTimer(){ if(tickIv){ clearInterval(tickIv); tickIv=null; } }
+
+function jobDone(){
+  const job=S.contract;
+  S.running=false;
+  if(!job.deep && !S.done.includes(job.id)) S.done.push(job.id);
+  const bonus = Math.round(job.pay*(1-S.trace/100)*0.5);
+  S.score+=bonus; if(S.score>S.best) S.best=S.score;
+  paintHead();
+  main.innerHTML='';
+  const k=document.createElement('div'); k.className='kick'; k.textContent=job.name;
+  const h=document.createElement('h1'); h.style.fontSize='clamp(32px,9vw,60px)'; h.textContent='OUT CLEAN';
+  const b=document.createElement('p'); b.className='blurb';
+  b.innerHTML='Every layer down with the trace at <em>'+Math.round(S.trace)+'%</em>. '+
+    'Quiet bonus <em>+'+bonus.toLocaleString()+'</em> for what they did not manage to log.';
+  const m=document.createElement('div'); m.id='msg';
+  const row=document.createElement('div'); row.className='row';
+  const back=document.createElement('button'); back.className='go'; back.textContent='Back to the board';
+  back.onclick=menu; row.appendChild(back);
+  main.appendChild(k); main.appendChild(h); main.appendChild(b); main.appendChild(m); main.appendChild(row);
+  sweep(300,900,0.5,0.12);
+  el('fLeft').textContent='CONTRACT CLOSED';
+}
+
+function burned(){
+  endLayerTimer();
+  if(currentApi&&currentApi.onEnd) currentApi.onEnd();
+  S.running=false;
+  const lost=Math.round(S.score*0.4);
+  S.score=Math.max(0,S.score-lost);
+  paintHead();
+  main.innerHTML='';
+  const k=document.createElement('div'); k.className='kick'; k.textContent=(S.contract&&S.contract.name)||'';
+  const h=document.createElement('h1'); h.style.color='#ff2418'; h.style.fontSize='clamp(34px,9vw,64px)';
+  h.textContent='TRACED';
+  const b=document.createElement('p'); b.className='blurb';
+  b.innerHTML='They walked it all the way back on layer '+S.layer+'. '+
+    '<em>−'+lost.toLocaleString()+'</em> burning the route and the box it ran on.<br>'+
+    'The trace never resets inside a contract — bail early and keep the layers you cleared.';
+  const m=document.createElement('div'); m.id='msg';
+  const row=document.createElement('div'); row.className='row';
+  const back=document.createElement('button'); back.className='go'; back.textContent='Back to the board';
+  back.onclick=menu; row.appendChild(back);
+  main.appendChild(k); main.appendChild(h); main.appendChild(b); main.appendChild(m); main.appendChild(row);
+  sweep(700,90,0.8,0.18);
+  el('fLeft').textContent='BURNED';
+}
+
+paintHead();
+menu();
+})();
+</script>
+</body>
+</html>
