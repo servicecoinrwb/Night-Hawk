@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RED EYE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,500;0,600;0,700;1,700&display=swap" rel="stylesheet">
+</head>
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="stealth-core.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   RED EYE — airport security operations centre, 4am.
+   The terminal is the centrepiece: two intrusion sessions, both
+   played at the keyboard while the floor keeps moving around you.
+   ═══════════════════════════════════════════════════════════════ */
+
+const M={ badge:false, phones:false, data:false, out:false };
+
+Stealth.init({
+  name:'RED EYE',
+  sub:'NIGHT HAWK — FIFTH JOB',
+  bpm:104, bg:0x05080e, ambient:0.62, mapScale:3.0,
+
+  blurb:"Landside is shut, the concourse lights are down to half, and the security operations centre "+
+        "is running on two people. <em>The switch room owns the phones</em> — take it and the cameras "+
+        "go with them. <em>The operations centre owns the data.</em> Both are terminal work, and a "+
+        "terminal is the one place you cannot watch the room while you work.",
+  help:
+    "<em>Two terminals, two sessions.</em> Each is a tap mini-game: retrace the route, line the fields up, catch the carrier. "+
+    "<em>The room does not stop.</em> Guards keep walking while the terminal is open and you cannot see them — pick your moment, and ABORT is always there. "+
+    "<em>Fumbling costs you.</em> Every wrong node or missed window pushes detection up; running the clock out spikes it hard. "+
+    "<em>The switch room is optional.</em> Own the phones and every camera in the building drops for a while. Skip it and do the whole job under the lenses. "+
+    "<em>Takedowns from behind only</em>, close, before he is suspicious.",
+  intro:[
+    {t:'Concourse is empty. Two on shift, both in the north end.',cls:'warn'},
+    {t:'Switch room east, operations centre west. You need a badge for either.'}
+  ],
+
+  levels:[{y:0,name:'CONCOURSE'}],
+  plate:{x0:-26,x1:26,z0:-16,z1:16},
+  spawn:{x:0,z:13,y:0,yaw:Math.PI},
+
+  tags:S=>[
+    {text:M.badge?'BADGE':'NO BADGE', cls:M.badge?'on':''},
+    {text:M.phones?'PHONES OWNED':'SWITCH LIVE', cls:M.phones?'on':''},
+    {text:M.data?'DATA PULLED':'NO DATA', cls:M.data?'on':''},
+    {text:S.camsDown>0?('CAMS DOWN '+Math.ceil(S.camsDown)+'s'):'CAMS LIVE', cls:S.camsDown>0?'hot':''}
+  ],
+
+  notes:S=>[
+    {got:M.badge, t:'Duty badge', s:'Off a shift guard. Opens the switch room and the operations centre.'},
+    {got:M.phones, t:'Phone switch', s:'Owned. Cameras drop with the trunk while you hold it.'},
+    {got:M.data, t:'Security data', s:'Pulled off the operations terminal. This is the job.'}
+  ],
+
+  objective:S=>{
+    if(!M.badge) return {t:'Get a badge',
+      w:'Both doors read one. Two guards on shift — either carries it. Take one from behind and search him.'};
+    if(!M.data) return {t:'Pull the data from operations',
+      w:M.phones
+        ? 'Cameras are down while you hold the switch. West end, operations centre — get on the terminal.'
+        : 'West end, operations centre. Worth taking the switch room east first: own the phones and every camera drops.'};
+    if(!M.out) return {t:'Walk out',
+      w:'South doors, the way you came in. Nothing else here is worth the time.'};
+    return {t:'Out',w:'South doors.'};
+  },
+
+  mapMarks:(S,li)=>[
+    {x:19,z:-11,c:M.phones?'rgba(77,255,158,.35)':'#5fe6ff'},
+    {x:-19,z:-11,c:M.data?'rgba(77,255,158,.35)':'#ffb020'},
+    {x:0,z:15,r:0.8,c:M.data?'#4dff9e':'rgba(143,154,184,.6)'}
+  ],
+
+  reset:S=>{ M.badge=false; M.phones=false; M.data=false; M.out=false; },
+
+  verdict:(won,why,S)=>{
+    if(won) return {title:S.downed===0?'GHOST':'CLEAN',
+      text:(M.phones?'Phones and data both, ':'Data out, ')+
+        (S.downed===0?'and nobody was touched. The shift ends and nobody files anything.'
+                     :S.downed+' on the floor and a very confused handover in the morning.')};
+    return {title: why==='body'?'BODY FOUND':'MADE',
+      text: why==='body'
+        ? 'Somebody walked into one of your bodies. Leave them inside the rooms, not out on the concourse where both routes cross.'
+        : 'A guard filled his meter. The terminal is the danger — you cannot see the room while you are on it, so clear the floor before you sit down, or abort the second you hear something.'};
+  },
+
+  build(A){
+    const {box,MAT,THREE,scene}=A;
+    const H=4.4;
+
+    function wallAlongZ(x,z0,z1,doorAt,doorW){
+      const segs=doorAt===null?[[z0,z1]]:[[z0,doorAt-doorW/2],[doorAt+doorW/2,z1]];
+      segs.forEach(g=>{const d=g[1]-g[0]; if(d>0.15) box(0.4,H,d,MAT.wall,x,H/2,(g[0]+g[1])/2,true);});
+    }
+    function wallAlongX(z,x0,x1,doorAt,doorW){
+      const segs=doorAt===null?[[x0,x1]]:[[x0,doorAt-doorW/2],[doorAt+doorW/2,x1]];
+      segs.forEach(g=>{const d=g[1]-g[0]; if(d>0.15) box(d,H,0.4,MAT.wall,(g[0]+g[1])/2,H/2,z,true);});
+    }
+    const lastCol=()=>A.colliders[A.colliders.length-1];
+
+    // shell
+    box(0.5,H,32,MAT.wall,-26,H/2,0,true);
+    box(0.5,H,32,MAT.wall,26,H/2,0,true);
+    box(52,H,0.5,MAT.wall,0,H/2,-16,true);
+    [[-16,20],[16,20]].forEach(w=> box(w[1],H,0.5,MAT.wall,w[0],H/2,16,true));
+
+    // concourse dressing: check-in row and seating
+    for(let i=0;i<7;i++) box(2.6,1.1,1.0,MAT.panel,-15+i*5,0.55,8,true,0.05);
+    for(let i=0;i<4;i++){
+      box(3.4,0.12,0.7,MAT.steel,-8+i*5.5,0.5,2,true,0.05);
+      box(3.4,0.7,0.1,MAT.steel,-8+i*5.5,0.85,2.35,false);
+    }
+    // departures board glow
+    box(7.0,1.6,0.12,MAT.dark,0,2.8,-15.7,false);
+    box(6.6,1.3,0.03,new THREE.MeshBasicMaterial({color:0x123a2a}),0,2.8,-15.6,false);
+
+    // ── EAST: switch room, x 12..26, z -16..-6 ──
+    wallAlongZ(12,-16,-6,-9.0,2.4);
+    wallAlongX(-6,12,26,null);
+    const swDoor=box(0.28,3.0,2.4,MAT.steel,12,1.5,-9.0,true);
+    const swCol=lastCol();
+    const swLamp=box(0.06,0.14,0.14,MAT.red,12.22,2.4,-9.0,false);
+    A.addInteract(swDoor,{
+      name:'SWITCH ROOM', hint:'Badge reader on the frame.', verb:'BADGE THROUGH',
+      locked:()=> M.badge?null:'No badge. A shift guard is carrying one.',
+      act(){ swDoor.position.set(12.6,1.5,-10.1); swDoor.rotation.y=1.15;
+        swLamp.material=MAT.green; swCol.hw=0.05; swCol.hd=0.05;
+        A.log('Switch room open.','good'); }
+    });
+    for(let i=0;i<4;i++){
+      box(1.0,2.3,1.0,MAT.rack,15+i*2.6,1.15,-13,true,0.1);
+      for(let k=0;k<6;k++){
+        const l=new THREE.Mesh(new THREE.BoxGeometry(0.45,0.03,0.03),MAT.green);
+        l.position.set(15+i*2.6,0.5+k*0.32,-12.47); scene.add(l);
+      }
+    }
+    box(2.6,0.08,1.1,MAT.steel,19,0.78,-11,true,0.1);
+    const swScreen=box(1.0,0.6,0.06,MAT.dark,19,1.3,-11.4,false);
+    const swGlow=box(0.9,0.5,0.02,MAT.cyan,19,1.3,-11.36,false);
+    A.addInteract(swGlow,{
+      name:'PHONE SWITCH', hint:()=> M.phones?'Yours already.':'Trunk controller. The cameras ride the same trunk.',
+      verb:'HOLD E — SIT DOWN', hold:1.0,
+      locked:()=> M.phones?'Already owned.':null,
+      act(){
+        A.openTerminal({ title:'TRUNK CONTROLLER', stages:['trace','cycle'], time:30,
+          onWin(){ M.phones=true; swGlow.material=MAT.green; A.killCams(70);
+            A.log('Phones are yours. Every camera in the building just went with them.','good'); }
+        });
+      }
+    });
+
+    // ── WEST: operations centre, x -26..-12, z -16..-6 ──
+    wallAlongZ(-12,-16,-6,-9.0,2.4);
+    wallAlongX(-6,-26,-12,null);
+    const opDoor=box(0.28,3.0,2.4,MAT.steel,-12,1.5,-9.0,true);
+    const opCol=lastCol();
+    const opLamp=box(0.06,0.14,0.14,MAT.red,-12.22,2.4,-9.0,false);
+    A.addInteract(opDoor,{
+      name:'OPERATIONS CENTRE', hint:'Badge reader.', verb:'BADGE THROUGH',
+      locked:()=> M.badge?null:'No badge.',
+      act(){ opDoor.position.set(-12.6,1.5,-10.1); opDoor.rotation.y=-1.15;
+        opLamp.material=MAT.green; opCol.hw=0.05; opCol.hd=0.05;
+        A.log('Operations centre open.','good'); }
+    });
+    // wall of monitors
+    for(let i=0;i<6;i++){
+      const mo=box(1.5,0.9,0.08,MAT.dark,-24.5+(i%3)*2.0,2.6-Math.floor(i/3)*1.1,-15.6,false);
+      box(1.35,0.75,0.02,new THREE.MeshBasicMaterial({color:0x10303c}),
+        -24.5+(i%3)*2.0,2.6-Math.floor(i/3)*1.1,-15.55,false);
+    }
+    box(4.2,0.08,1.2,MAT.steel,-19,0.78,-11,true,0.1);
+    const opScreen=box(1.1,0.65,0.06,MAT.dark,-19,1.32,-11.5,false);
+    const opGlow=box(1.0,0.55,0.02,MAT.amber,-19,1.32,-11.46,false);
+    A.addInteract(opGlow,{
+      name:'OPERATIONS TERMINAL',
+      hint:()=> M.data?'Already emptied.':'Everything the centre holds is behind this login.',
+      verb:'HOLD E — SIT DOWN', hold:1.0,
+      locked:()=> M.data?'Already pulled.':null,
+      act(){
+        A.openTerminal({ title:'OPERATIONS CENTRE', stages:['trace','cycle','lock'],
+          time: M.phones?38:30,
+          onWin(){ M.data=true; opGlow.material=MAT.green;
+            A.log('Data pulled. That is the job — now walk.','good'); }
+        });
+      }
+    });
+
+    // ── exit ──
+    const exit=box(6.0,3.2,0.3,MAT.dark,0,1.6,15.9,false);
+    A.addInteract(exit,{
+      name:'LANDSIDE DOORS', hint:'The way you came in.', verb:'HOLD E — LEAVE', hold:1.4,
+      locked:()=> M.data?null:'Not without the data.',
+      act(){ M.out=true; A.finish(true); }
+    });
+
+    // ── shift ──
+    const takeBadge=()=>{ if(M.badge){ A.log('Another duty badge. You have one.'); return; }
+      M.badge=true;
+      A.showDoc('DUTY BADGE','Proximity card on a lanyard, shift sticker peeling off the back. '+
+        'Reads on the switch room and the operations centre — everything landside is dead at this hour anyway.');
+      A.log('Badge. Both doors will read it now.','good'); A.setObjective(); };
+
+    A.addGuard({name:'NORTH', level:0, speed:1.5, badge:true, badgeColor:0x5fe6ff,
+      path:[[-8,-12],[-8,-2],[8,-2],[8,-12]], onSearch:takeBadge});
+    A.addGuard({name:'CONCOURSE', level:0, speed:1.6, badge:true, badgeColor:0x5fe6ff,
+      path:[[-18,4],[18,4],[18,11],[-18,11]], onSearch:takeBadge});
+
+    A.addCamera({x:-24,y:3.3,z:-2,base:2.2,sweep:0.38,range:12,level:0});
+    A.addCamera({x:24,y:3.3,z:-2,base:-2.2,sweep:0.38,range:12,level:0});
+    A.addCamera({x:0,y:3.3,z:10,base:Math.PI,sweep:0.5,range:13,level:0});
+    A.addCamera({x:-19,y:3.3,z:-6.4,base:Math.PI,sweep:0.3,range:9,level:0});
+  }
+});
+</script>
+</body>
+</html>
