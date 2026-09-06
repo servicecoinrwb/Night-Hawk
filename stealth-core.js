@@ -268,20 +268,9 @@ const HTML = `
     <button class="ghost" id="endBackBtn">Back to menu</button></div>
 </div>`;
 
-// ═══════════════ campaign chaining ═══════════════
-const CQ=new URLSearchParams(location.search);
-const CAMPAIGN=CQ.get('campaign')==='1';
-const LEG=+(CQ.get('leg')||0);
-const CTIME=+(CQ.get('t')||0);
-const CDOWN=+(CQ.get('down')||0);
-const CHAIN=[
-  'night-hawk.html?campaign=1&leg=1&dist=2600',
-  'dark-fiber.html?campaign=1&leg=2',
-  'night-hawk.html?campaign=1&leg=3&dist=3200&hostile=1',
-  'clearance.html?campaign=1&leg=4',
-  'night-hawk.html?campaign=1&leg=5&dist=3800&hostile=1',
-  'night-deposit.html?campaign=1&leg=6'
-];
+// ═══════════════ campaign chaining (definitions live in night.js) ═══════════════
+const CQ=Night.q, CAMPAIGN=Night.campaign, LEG=Night.leg, CTIME=Night.time, CDOWN=Night.down;
+const CHAIN=Night.CHAIN;
 Stealth.CHAIN=CHAIN; Stealth.CAMPAIGN=CAMPAIGN; Stealth.LEG=LEG;
 
 // ═══════════════ engine ═══════════════
@@ -1100,12 +1089,13 @@ function finish(won,why){
   document.getElementById('endTitle').textContent=v.title;
   let txt=v.text;
   const cont=document.getElementById('continueBtn');
-  const nxt=(won&&CAMPAIGN)?(CHAIN[LEG]?CHAIN[LEG]+'&t='+Math.round(CTIME+S.time)+'&down='+(CDOWN+S.downed):null):null;
   if(won&&CAMPAIGN){
+    const nxt=Night.nextURL(S.time,S.downed);
+    const last=LEG>=Night.count;
     cont.style.display='';
-    cont.textContent=nxt?'Back to the car':'Finish the night';
-    cont.onclick=()=>location.href = nxt || ('index.html?done=1&t='+Math.round(CTIME+S.time)+'&down='+(CDOWN+S.downed));
-    txt+='  Night so far: '+clockText(CTIME+S.time)+' across '+LEG+' legs.';
+    cont.textContent=last?'Finish the night':'Back to the car';
+    cont.onclick=()=>location.href=nxt;
+    txt+='  Night so far: '+clockText(Night.total(S.time))+' — leg '+LEG+' of '+Night.count+'.';
   } else cont.style.display='none';
   document.getElementById('endWhy').textContent=txt;
   endS.classList.remove('hidden');
