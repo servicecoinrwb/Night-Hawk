@@ -540,7 +540,7 @@ function buildGuard(path,speed,name){
   const cone=new THREE.Mesh(new THREE.ConeGeometry(2.6,9,14,1,true),
     new THREE.MeshBasicMaterial({color:0xffb020,transparent:true,opacity:0.045,
       side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
-  cone.rotation.x=Math.PI/2; cone.position.set(0,1.5,4.5); g.add(cone);
+  cone.rotation.x=-Math.PI/2; cone.position.set(0,1.5,4.5); g.add(cone);
 
   const gd={g,path,speed,name,wp:1,sus:0,down:false,pause:0,lamp,cone,head,torso,legs,cap,
             face:0,searched:false};
@@ -788,13 +788,13 @@ function buildCam(x,z,base,sweep,range){
   const cone=new THREE.Mesh(new THREE.ConeGeometry(2.5,range,14,1,true),
     new THREE.MeshBasicMaterial({color:0xff5a3c,transparent:true,opacity:0.05,
       side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
-  cone.rotation.x=Math.PI/2; cone.position.z=range/2; cone.rotation.z=0; g.add(cone);
+  cone.rotation.x=-Math.PI/2; cone.position.z=range/2; g.add(cone);
   cone.position.y=-0.9;
   const c={g,base,sweep,range,dot,cone,sus:0,t:Math.random()*6};
   seccams.push(c); return c;
 }
-buildCam(-13.0,-18.0,-0.7,0.5,11);
-buildCam(13.0,9.0,2.5,0.44,11);
+buildCam(-13.0,-18.0,0.7,0.5,11);
+buildCam(13.0,9.0,-2.5,0.44,11);
 buildCam(34.6,8.0,3.5,0.4,9);
 
 function tickCams(dt){
